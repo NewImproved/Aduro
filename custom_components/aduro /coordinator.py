@@ -265,7 +265,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         current_state = data["operating"].get("state")
         current_heatlevel = data["operating"].get("heatlevel")
         current_operation_mode = data["status"].get("operation_mode")
-        current_temperature = data["operating"].get("boiler_ref")
+        current_temperature_ref = data["operating"].get("boiler_ref")
         
         # Track wood mode transitions
         is_in_wood_mode = current_state in ["9", "14"]
@@ -275,7 +275,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             _LOGGER.info("Entering wood mode (state: %s), saving pellet mode settings", current_state)
             self._pre_wood_mode_operation_mode = current_operation_mode
             self._pre_wood_mode_heatlevel = current_heatlevel
-            self._pre_wood_mode_temperature = current_temperature
+            self._pre_wood_mode_temperature = current_temperature_ref
             self._was_in_wood_mode = True
         
         # Exiting wood mode - auto-resume if enabled
@@ -303,13 +303,13 @@ class AduroCoordinator(DataUpdateCoordinator):
                 
         elif current_operation_mode == 1:  # Temperature mode
             if (self._previous_temperature is not None and 
-                current_temperature != self._previous_temperature and
+                current_temperature_ref != self._previous_temperature and
                 not self._toggle_heat_target):
                 app_change_detected = True
                 _LOGGER.info("External temperature change detected: %s -> %s", 
-                           self._previous_temperature, current_temperature)
+                           self._previous_temperature, current_temperature_ref)
                 # Update our target to match
-                self._target_temperature = current_temperature
+                self._target_temperature = current_temperature_ref
         
         # Detect operation mode changes
         if (self._previous_operation_mode is not None and 
@@ -346,7 +346,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Update previous values
         self._previous_state = current_state
         self._previous_heatlevel = current_heatlevel
-        self._previous_temperature = current_temperature
+        self._previous_temperature = current_temperature_ref
         self._previous_operation_mode = current_operation_mode
         
         # Add detection flag to data
@@ -361,7 +361,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             return
         
         current_heatlevel = data["operating"].get("heatlevel")
-        current_temperature = data["operating"].get("boiler_ref")
+        current_temperature_ref = data["operating"].get("boiler_ref")
         current_operation_mode = data["status"].get("operation_mode")
         
         # Check if change is complete
@@ -372,7 +372,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 change_complete = False
                 
         if self._target_temperature is not None:
-            if current_temperature != self._target_temperature:
+            if current_temperature_ref != self._target_temperature:
                 change_complete = False
         
         if self._target_operation_mode is not None:
@@ -552,13 +552,14 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         current_operation_mode = data["status"].get("operation_mode", 0)
         current_heatlevel = data["operating"].get("heatlevel", 1)
-        current_temperature = data["operating"].get("boiler_ref", 20)
+        current_temperature_ref = data["operating"].get("boiler_ref", 20)
+        current_temperature = data["operating"].get("boiler_temp", 20)
         
         # Boolean checks
         heatlevel_match = (self._target_heatlevel == current_heatlevel 
                           if self._target_heatlevel is not None 
                           else True)
-        temp_match = (self._target_temperature == current_temperature 
+        temp_match = (self._target_temperature == current_temperature_ref 
                      if self._target_temperature is not None 
                      else True)
         mode_match = (self._target_operation_mode == current_operation_mode 
@@ -585,7 +586,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             display_target = self._target_heatlevel if self._target_heatlevel is not None else current_heatlevel
             display_target_type = "heatlevel"
         elif display_mode == 1:  # Temperature mode
-            display_target = self._target_temperature if self._target_temperature is not None else current_temperature
+            display_target = self._target_temperature if self._target_temperature is not None else current_temperature_ref
             display_target_type = "temperature"
         else:  # Wood mode
             display_target = 0

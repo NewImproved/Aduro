@@ -1,0 +1,12 @@
+{
+  "domain": "aduro",
+  "name": "Aduro Hybrid Stove",
+  "codeowners": ["@NewImproved"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/NewImproved/Aduro",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/NewImproved/Aduro/issues",
+  "requirements": ["paho-mqtt>=1.6.1"],
+  "version": "1.0.0"
+}

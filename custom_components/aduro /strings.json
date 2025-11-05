@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "stove_model": "[%key:component::aduro::config::step::user::data::stove_model%]",
+          "stove_serial": "[%key:component::aduro::config::step::user::data::stove_serial%]",
+          "stove_pin": "[%key:component::aduro::config::step::user::data::stove_pin%]",
+          "mqtt_host": "[%key:component::aduro::config::step::user::data::mqtt_host%]",
+          "mqtt_port": "[%key:component::aduro::config::step::user::data::mqtt_port%]",
+          "mqtt_username": "[%key:component::aduro::config::step::user::data::mqtt_username%]",
+          "mqtt_password": "[%key:component::aduro::config::step::user::data::mqtt_password%]"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "stove_model": "[%key:component::aduro::config::step::user::data::stove_model%]",
+          "mqtt_host": "[%key:component::aduro::config::step::user::data::mqtt_host%]",
+          "mqtt_port": "[%key:component::aduro::config::step::user::data::mqtt_port%]",
+          "mqtt_username": "[%key:component::aduro::config::step::user::data::mqtt_username%]",
+          "mqtt_password": "[%key:component::aduro::config::step::user::data::mqtt_password%]"
+        }
+      }
+    }
+  }
+}

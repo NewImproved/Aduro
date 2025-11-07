@@ -59,7 +59,6 @@ If you can confirm that the integration work for a stove, please let me know via
 ## Prerequisites
 
 - Home Assistant 2023.1 or newer
-- MQTT broker (e.g., Mosquitto)
 - Aduro hybrid stove with network connectivity
 - Stove serial number and PIN code
 
@@ -95,13 +94,8 @@ If you can confirm that the integration work for a stove, please let me know via
    - **Stove Model**: Select your model (H1-H6)
    - **Serial Number**: Your stove's serial number
    - **PIN Code**: Your stove's PIN code
-   - **MQTT Broker Host**: IP address or hostname
-   - **MQTT Broker Port**: Default 1883
-   - **MQTT Username**: Optional
-   - **MQTT Password**: Optional
 
 The integration will automatically:
-- Set the correct MQTT base path for your model
 - Discover your stove on the network
 - Create all entities
 
@@ -339,12 +333,10 @@ entities:
 
 - Ensure stove is powered on and connected to network
 - Check that serial number and PIN are correct
-- Verify MQTT broker is running and accessible
 - Check firewall settings
 
 ### Commands Not Working
 
-- Verify MQTT credentials are correct
 - Check Home Assistant logs for errors
 - Ensure stove is not in wood mode (state 9 or 14)
 - Try restarting the integration

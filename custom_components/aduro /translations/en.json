@@ -7,20 +7,12 @@
         "data": {
           "stove_model": "Stove Model",
           "stove_serial": "Stove Serial Number",
-          "stove_pin": "Stove PIN Code",
-          "mqtt_host": "MQTT Broker Host",
-          "mqtt_port": "MQTT Broker Port",
-          "mqtt_username": "MQTT Username (optional)",
-          "mqtt_password": "MQTT Password (optional)"
+          "stove_pin": "Stove PIN Code"
         },
         "data_description": {
           "stove_model": "Select your Aduro stove model (H1, H2, H3, H4, H5, or H6)",
           "stove_serial": "The serial number found on your stove",
-          "stove_pin": "The PIN code for your stove",
-          "mqtt_host": "The IP address or hostname of your MQTT broker",
-          "mqtt_port": "The port for your MQTT broker (default: 1883)",
-          "mqtt_username": "Optional: Username for MQTT authentication",
-          "mqtt_password": "Optional: Password for MQTT authentication"
+          "stove_pin": "The PIN code for your stove"
         }
       }
     },
@@ -39,18 +31,10 @@
         "title": "Configure Aduro Options",
         "description": "Update your Aduro stove settings",
         "data": {
-          "stove_model": "Stove Model",
-          "mqtt_host": "MQTT Broker Host",
-          "mqtt_port": "MQTT Broker Port",
-          "mqtt_username": "MQTT Username",
-          "mqtt_password": "MQTT Password"
+          "stove_model": "Stove Model"
         },
         "data_description": {
-          "stove_model": "Change your stove model if needed",
-          "mqtt_host": "Update MQTT broker address",
-          "mqtt_port": "Update MQTT broker port",
-          "mqtt_username": "Update MQTT username",
-          "mqtt_password": "Update MQTT password"
+          "stove_model": "Change your stove model if needed"
         }
       }
     }

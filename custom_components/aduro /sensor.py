@@ -116,6 +116,7 @@ class AduroSensorBase(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_{sensor_type}"
         self._attr_name = name
         self._sensor_type = sensor_type
+        self._last_valid_value = None  # Store last valid value
 
     @property
     def device_info(self):
@@ -127,6 +128,28 @@ class AduroSensorBase(CoordinatorEntity, SensorEntity):
             "model": f"Hybrid {self.coordinator.stove_model}",
             "sw_version": self.coordinator.entry.data.get("version", "Unknown"),
         }
+    
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        # Only unavailable if coordinator failed to update (connection lost)
+        if not self.coordinator.last_update_success:
+            return False
+        
+        # Check if stove IP is available (indicates connectivity)
+        if not self.coordinator.stove_ip:
+            return False
+        
+        return True
+    
+    def _get_cached_value(self, current_value, default=None):
+        """Return current value or last cached value if current is None."""
+        if current_value is not None:
+            self._last_valid_value = current_value
+            return current_value
+        
+        # Return last valid value if we have one, otherwise default
+        return self._last_valid_value if self._last_valid_value is not None else default
 
 
 # =============================================================================
@@ -546,9 +569,10 @@ class AduroConsumptionDaySensor(AduroSensorBase):
     @property
     def native_value(self) -> float | None:
         """Return today's consumption."""
+        current_value = None
         if self.coordinator.data and "consumption" in self.coordinator.data:
-            return self.coordinator.data["consumption"].get("day")
-        return None
+            current_value = self.coordinator.data["consumption"].get("day")
+        return self._get_cached_value(current_value)
 
 
 class AduroConsumptionYesterdaySensor(AduroSensorBase):
@@ -565,9 +589,10 @@ class AduroConsumptionYesterdaySensor(AduroSensorBase):
     @property
     def native_value(self) -> float | None:
         """Return yesterday's consumption."""
+        current_value = None
         if self.coordinator.data and "consumption" in self.coordinator.data:
-            return self.coordinator.data["consumption"].get("yesterday")
-        return None
+            current_value = self.coordinator.data["consumption"].get("yesterday")
+        return self._get_cached_value(current_value)
 
 
 class AduroConsumptionMonthSensor(AduroSensorBase):
@@ -584,9 +609,10 @@ class AduroConsumptionMonthSensor(AduroSensorBase):
     @property
     def native_value(self) -> float | None:
         """Return this month's consumption."""
+        current_value = None
         if self.coordinator.data and "consumption" in self.coordinator.data:
-            return self.coordinator.data["consumption"].get("month")
-        return None
+            current_value = self.coordinator.data["consumption"].get("month")
+        return self._get_cached_value(current_value)
 
 
 class AduroConsumptionYearSensor(AduroSensorBase):
@@ -603,9 +629,10 @@ class AduroConsumptionYearSensor(AduroSensorBase):
     @property
     def native_value(self) -> float | None:
         """Return this year's consumption."""
+        current_value = None
         if self.coordinator.data and "consumption" in self.coordinator.data:
-            return self.coordinator.data["consumption"].get("year")
-        return None
+            current_value = self.coordinator.data["consumption"].get("year")
+        return self._get_cached_value(current_value)
 
 
 # =============================================================================
@@ -624,8 +651,7 @@ class AduroStoveIPSensor(AduroSensorBase):
     def native_value(self) -> str | None:
         """Return the stove IP."""
         return self.coordinator.stove_ip
-
-
+        
 class AduroRouterSSIDSensor(AduroSensorBase):
     """Sensor for router SSID."""
 
@@ -637,9 +663,10 @@ class AduroRouterSSIDSensor(AduroSensorBase):
     @property
     def native_value(self) -> str | None:
         """Return the router SSID."""
+        current_value = None
         if self.coordinator.data and "network" in self.coordinator.data:
-            return self.coordinator.data["network"].get("router_ssid")
-        return None
+            current_value = self.coordinator.data["network"].get("router_ssid")
+        return self._get_cached_value(current_value)
 
 
 class AduroStoveRSSISensor(AduroSensorBase):
@@ -655,14 +682,15 @@ class AduroStoveRSSISensor(AduroSensorBase):
     @property
     def native_value(self) -> int | None:
         """Return the WiFi signal strength."""
+        current_value = None
         if self.coordinator.data and "network" in self.coordinator.data:
             rssi = self.coordinator.data["network"].get("stove_rssi")
             if rssi:
                 try:
-                    return int(rssi)
+                    current_value = int(rssi)
                 except (ValueError, TypeError):
-                    return None
-        return None
+                    pass
+        return self._get_cached_value(current_value)
 
 
 class AduroStoveMacSensor(AduroSensorBase):
@@ -676,10 +704,10 @@ class AduroStoveMacSensor(AduroSensorBase):
     @property
     def native_value(self) -> str | None:
         """Return the stove MAC address."""
+        current_value = None
         if self.coordinator.data and "network" in self.coordinator.data:
-            return self.coordinator.data["network"].get("stove_mac")
-        return None
-
+            current_value = self.coordinator.data["network"].get("stove_mac")
+        return self._get_cached_value(current_value)
 
 # =============================================================================
 # Timer Sensors
@@ -751,17 +779,31 @@ class AduroOperatingTimeStoveSensor(AduroSensorBase):
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "operating_time_stove", "Operating Time Stove")
-        self._attr_device_class = SensorDeviceClass.DURATION
-        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
-        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         self._attr_icon = "mdi:clock"
 
     @property
-    def native_value(self) -> int | None:
-        """Return the operating time."""
+    def native_value(self) -> str | None:
+        """Return the operating time formatted as H:MM:SS or HH:MM:SS or HHH:MM:SS."""
         if self.coordinator.data and "operating" in self.coordinator.data:
-            return self.coordinator.data["operating"].get("operating_time_stove")
+            total_seconds = self.coordinator.data["operating"].get("operating_time_stove")
+            if total_seconds is not None:
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                return f"{hours}:{minutes:02d}:{seconds:02d}"
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if self.coordinator.data and "operating" in self.coordinator.data:
+            total_seconds = self.coordinator.data["operating"].get("operating_time_stove")
+            if total_seconds is not None:
+                return {
+                    "total_seconds": total_seconds,
+                    "total_hours": round(total_seconds / 3600, 2),
+                }
+        return {}
 
 
 class AduroOperatingTimeAugerSensor(AduroSensorBase):
@@ -770,17 +812,31 @@ class AduroOperatingTimeAugerSensor(AduroSensorBase):
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "operating_time_auger", "Operating Time Auger")
-        self._attr_device_class = SensorDeviceClass.DURATION
-        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
-        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         self._attr_icon = "mdi:clock"
 
     @property
-    def native_value(self) -> int | None:
-        """Return the auger operating time."""
+    def native_value(self) -> str | None:
+        """Return the auger operating time formatted as HHH:MM:SS."""
         if self.coordinator.data and "operating" in self.coordinator.data:
-            return self.coordinator.data["operating"].get("operating_time_auger")
+            total_seconds = self.coordinator.data["operating"].get("operating_time_auger")
+            if total_seconds is not None:
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                return f"{hours}:{minutes:02d}:{seconds:02d}"
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if self.coordinator.data and "operating" in self.coordinator.data:
+            total_seconds = self.coordinator.data["operating"].get("operating_time_auger")
+            if total_seconds is not None:
+                return {
+                    "total_seconds": total_seconds,
+                    "total_hours": round(total_seconds / 3600, 2),
+                }
+        return {}
 
 
 class AduroOperatingTimeIgnitionSensor(AduroSensorBase):
@@ -789,17 +845,31 @@ class AduroOperatingTimeIgnitionSensor(AduroSensorBase):
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "operating_time_ignition", "Operating Time Ignition")
-        self._attr_device_class = SensorDeviceClass.DURATION
-        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
-        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         self._attr_icon = "mdi:clock"
 
     @property
-    def native_value(self) -> int | None:
-        """Return the ignition operating time."""
+    def native_value(self) -> str | None:
+        """Return the ignition operating time formatted as HHH:MM:SS."""
         if self.coordinator.data and "operating" in self.coordinator.data:
-            return self.coordinator.data["operating"].get("operating_time_ignition")
+            total_seconds = self.coordinator.data["operating"].get("operating_time_ignition")
+            if total_seconds is not None:
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                return f"{hours}:{minutes:02d}:{seconds:02d}"
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if self.coordinator.data and "operating" in self.coordinator.data:
+            total_seconds = self.coordinator.data["operating"].get("operating_time_ignition")
+            if total_seconds is not None:
+                return {
+                    "total_seconds": total_seconds,
+                    "total_hours": round(total_seconds / 3600, 2),
+                }
+        return {}
 
 
 # =============================================================================

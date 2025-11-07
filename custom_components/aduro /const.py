@@ -30,7 +30,7 @@ STOVE_MODELS: Final = [
 # Defaults
 DEFAULT_STOVE_MODEL: Final = STOVE_MODEL_H2
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=20)
-DEFAULT_CAPACITY_PELLETS: Final = 9.5
+DEFAULT_CAPACITY_PELLETS: Final = 9.1
 DEFAULT_NOTIFICATION_LEVEL: Final = 10
 DEFAULT_SHUTDOWN_LEVEL: Final = 5
 
@@ -75,18 +75,18 @@ TEMP_MAX: Final = 35
 TEMP_STEP: Final = 1
 
 # Pellet capacity settings
-PELLET_CAPACITY_MIN: Final = 9.0
+PELLET_CAPACITY_MIN: Final = 8.0
 PELLET_CAPACITY_MAX: Final = 10.0
 PELLET_CAPACITY_STEP: Final = 0.1
 
 # Notification settings
 NOTIFICATION_LEVEL_MIN: Final = 0
-NOTIFICATION_LEVEL_MAX: Final = 20
+NOTIFICATION_LEVEL_MAX: Final = 100
 NOTIFICATION_LEVEL_STEP: Final = 1
 
 # Shutdown settings
-SHUTDOWN_LEVEL_MIN: Final = -10
-SHUTDOWN_LEVEL_MAX: Final = 15
+SHUTDOWN_LEVEL_MIN: Final = 0
+SHUTDOWN_LEVEL_MAX: Final = 100
 SHUTDOWN_LEVEL_STEP: Final = 1
 
 # State mappings - Main states with formatting support

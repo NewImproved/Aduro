@@ -63,23 +63,73 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
         number_type: str,
         name: str,
     ) -> None:
-        """Initialize the number entity."""
+        """Initialize the sensor."""
         super().__init__(coordinator)
+        self.entry = entry
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{entry.entry_id}_{number_type}"
         self._attr_name = name
         self._number_type = number_type
 
+    def combined_firmware_version(self) -> str | None:
+        """Return combined firmware version string."""
+        version = self.coordinator.firmware_version
+        build = self.coordinator.firmware_build
+
+        _LOGGER.debug(
+            "Getting firmware version - version: %s, build: %s",
+            version,
+            build
+        )
+
+        if version and build:
+            return f"{version}.{build}"
+        elif version:
+            return version
+        return None
+
+
     @property
     def device_info(self):
         """Return device information."""
-        return {
-            "identifiers": {(DOMAIN, self.coordinator.entry.entry_id)},
+        # Always get the latest firmware version from coordinator
+        sw_version = self.combined_firmware_version()
+        
+        # Base device data - always include these
+        device_data = {
+            "identifiers": {(DOMAIN, f"aduro_{self.coordinator.entry.entry_id}")},
             "name": f"Aduro {self.coordinator.stove_model}",
             "manufacturer": "Aduro",
             "model": f"Hybrid {self.coordinator.stove_model}",
-            "sw_version": self.coordinator.entry.data.get("version", "Unknown"),
         }
+        
+        # ALWAYS include sw_version, even if None initially
+        # This ensures the device registry entry has the field
+        device_data["sw_version"] = sw_version
+        
+        return device_data
+        
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        # Only unavailable if coordinator failed to update (connection lost)
+        if not self.coordinator.last_update_success:
+            return False
+        
+        # Check if stove IP is available (indicates connectivity)
+        if not self.coordinator.stove_ip:
+            return False
+        
+        return True
+
+    def _get_cached_value(self, current_value, default=None):
+        """Return current value or last cached value if current is None."""
+        if current_value is not None:
+            self._last_valid_value = current_value
+            return current_value
+        
+        # Return last valid value if we have one, otherwise default
+        return self._last_valid_value if self._last_valid_value is not None else default
 
 
 class AduroHeatlevelNumber(AduroNumberBase):

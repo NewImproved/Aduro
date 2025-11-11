@@ -5,7 +5,7 @@
 [![GitHub release](https://img.shields.io/github/release/NewImproved/Aduro.svg)](https://github.com/NewImproved/Aduro/releases)
 [![License](https://img.shields.io/github/license/NewImproved/Aduro.svg)](LICENSE)
 
-A comprehensive Home Assistant custom integration for Aduro H2 [H1, H3, H4, H5, and H6 unconfirmed] hybrid pellet stoves.
+A comprehensive Home Assistant custom integration for Aduro H1, H2 [H3, H4, H5, and H6 unconfirmed] hybrid pellet stoves.
 
 ## Features
 
@@ -46,11 +46,10 @@ A comprehensive Home Assistant custom integration for Aduro H2 [H1, H3, H4, H5, 
 - Easy to add more languages
 
 ## Supported Models
-Only Aduro H2 have been tested.
+Only Aduro H1 & H2 have been tested.
 
 Asumptions have been made for how the following stoves work, and are not yet confirmed.
 If you can confirm that the integration work for a stove, please let me know via [GitHub Issues](https://github.com/NewImproved/Aduro/issues).
-- Aduro H1
 - Aduro H3
 - Aduro H4
 - Aduro H5
@@ -128,7 +127,6 @@ To change settings later:
 
 #### Power
 - **Power Output** - Power in kW
-- **Power Percentage** - Power as percentage
 
 #### Pellets
 - **Pellets Remaining** - Remaining pellets (kg)
@@ -149,10 +147,9 @@ To change settings later:
 - **WiFi Signal Strength** - RSSI in dBm
 - **MAC Address** - Network MAC
 
-#### Timers
-- **Ignition Timer 1** - Phase 1 countdown
-- **Ignition Timer 2** - Phase 2 countdown
-
+#### Firmware
+- **Firmware** - Version and build
+- 
 #### Runtime
 - **Total Operating Time** - Lifetime runtime
 - **Auger Operating Time** - Auger runtime
@@ -175,7 +172,7 @@ To change settings later:
 
 - **Heat Level** - Set heat level (1-3)
 - **Target Temperature** - Set temperature (5-35°C)
-- **Pellet Capacity** - Configure hopper capacity (9-10 kg)
+- **Pellet Capacity** - Configure hopper capacity (8-25 kg)
 - **Low Pellet Notification Level** - Warning threshold (%)
 - **Auto-Shutdown Pellet Level** - Shutdown threshold (%)
 

@@ -410,13 +410,21 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 
 ## Credits
 
-- Based on [pyduro](https://github.com/clementprevot/pyduro) by @clementprevot
-- Based on [python_scripts](https://github.com/SpaceTeddy/homeassistant_aduro_stove_control_python_scripts) by @SpaceTeddy
-- Integration developed by [@NewImproved](https://github.com/NewImproved) with much help from claude.ai
+This integration is built upon the excellent work of:
+
+- **[Clément Prévot](https://github.com/clementprevot)** - Creator of [pyduro](https://github.com/clementprevot/pyduro), the Python library for controlling Aduro hybrid stoves
+- **[SpaceTeddy](https://github.com/SpaceTeddy)** - Creator of [Home Assistant Aduro stove control scripts](https://github.com/SpaceTeddy/homeassistant_aduro_stove_control_python_scripts)
+
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/NewImproved/Aduro/edit/main/LICENSE.md) file for details.
+
+This project incorporates code from:
+- [pyduro](https://github.com/clementprevot/pyduro) by Clément Prévot (MIT License)
+- [homeassistant_aduro_stove_control_python_scripts](https://github.com/SpaceTeddy/homeassistant_aduro_stove_control_python_scripts) by SpaceTeddy (GPL-2.0 license)
+
+See [NOTICE](NOTICE) file for full third-party attribution details.
 
 ## Disclaimer
 

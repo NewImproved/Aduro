@@ -306,40 +306,43 @@ class AduroCoordinator(DataUpdateCoordinator):
             data["app_change_detected"] = False
             return
 
-        # Detect external changes (from app) - ONLY when we're NOT changing things
+        # Detect external changes (from app)
         app_change_detected = False
         
-        # KEY FIX: Only detect app changes when change_in_progress is False
-        if not self._change_in_progress:
-            if current_operation_mode == 0:  # Heatlevel mode
-                if (self._previous_heatlevel is not None and 
-                    current_heatlevel != self._previous_heatlevel):
+        # Always check for changes and update targets, but only flag as "app_change" when not in progress
+        if current_operation_mode == 0:  # Heatlevel mode
+            if (self._previous_heatlevel is not None and 
+                current_heatlevel != self._previous_heatlevel):
+                if not self._change_in_progress:
                     app_change_detected = True
-                    _LOGGER.info(
-                        "External heatlevel change detected: %s -> %s (power_pct: %d%%)",
-                        self._previous_heatlevel,
-                        current_heatlevel,
-                        data["operating"].get("power_pct", 0)
-                    )
-                    # Update our target to match
-                    self._target_heatlevel = current_heatlevel
-                    
-            elif current_operation_mode == 1:  # Temperature mode
-                if (self._previous_temperature is not None and 
-                    current_temperature_ref != self._previous_temperature):
+                _LOGGER.info(
+                    "External heatlevel change detected: %s -> %s (power_pct: %d%%)",
+                    self._previous_heatlevel,
+                    current_heatlevel,
+                    data["operating"].get("power_pct", 0)
+                )
+                # Always update our target to match current value
+                self._target_heatlevel = current_heatlevel
+                
+        elif current_operation_mode == 1:  # Temperature mode
+            if (self._previous_temperature is not None and 
+                current_temperature_ref != self._previous_temperature):
+                if not self._change_in_progress:
                     app_change_detected = True
-                    _LOGGER.info("External temperature change detected: %s -> %s", 
-                            self._previous_temperature, current_temperature_ref)
-                    # Update our target to match
-                    self._target_temperature = current_temperature_ref
-            
-            # Detect operation mode changes
-            if (self._previous_operation_mode is not None and 
-                current_operation_mode != self._previous_operation_mode):
+                _LOGGER.info("External temperature change detected: %s -> %s", 
+                        self._previous_temperature, current_temperature_ref)
+                # Always update our target to match current value
+                self._target_temperature = current_temperature_ref
+        
+        # Detect operation mode changes
+        if (self._previous_operation_mode is not None and 
+            current_operation_mode != self._previous_operation_mode):
+            if not self._change_in_progress:
                 app_change_detected = True
-                _LOGGER.info("External operation mode change detected: %s -> %s",
-                        self._previous_operation_mode, current_operation_mode)
-                self._target_operation_mode = current_operation_mode
+            _LOGGER.info("External operation mode change detected: %s -> %s",
+                    self._previous_operation_mode, current_operation_mode)
+            self._target_operation_mode = current_operation_mode
+            
         else:
             # When change is in progress, don't flag as app change
             _LOGGER.debug("Change in progress, skipping app change detection")

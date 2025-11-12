@@ -87,7 +87,6 @@ async def async_setup_entry(
         AduroOperatingTimeIgnitionSensor(coordinator, entry),
         
         # Calculated/status sensors
-        AduroModeTransitionSensor(coordinator, entry),
         AduroChangeInProgressSensor(coordinator, entry),
         AduroDisplayFormatSensor(coordinator, entry),
         AduroDisplayTargetSensor(coordinator, entry),
@@ -856,21 +855,6 @@ class AduroOperatingTimeIgnitionSensor(AduroSensorBase):
 # =============================================================================
 # Calculated/Status Sensors
 # =============================================================================
-
-class AduroModeTransitionSensor(AduroSensorBase):
-    """Sensor for mode transition state."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "mode_transition", "Mode Transition")
-        self._attr_icon = "mdi:state-machine"
-
-    @property
-    def native_value(self) -> str | None:
-        """Return the mode transition state."""
-        if self.coordinator.data and "calculated" in self.coordinator.data:
-            return self.coordinator.data["calculated"].get("mode_transition", "idle")
-        return "idle"
 
 
 class AduroChangeInProgressSensor(AduroSensorBase):

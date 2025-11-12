@@ -1,6 +1,7 @@
-"""Number platform for Aduro Hybrid Stove integration."""
+"""Number platform with debouncing for Aduro Hybrid Stove integration."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -32,6 +33,9 @@ from .const import (
 from .coordinator import AduroCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+# Debounce delay in seconds - wait this long after last change before sending
+DEBOUNCE_DELAY = 1.0
 
 
 async def async_setup_entry(
@@ -70,6 +74,10 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
         self._attr_unique_id = f"{entry.entry_id}_{number_type}"
         self._attr_name = name
         self._number_type = number_type
+        
+        # Debouncing support
+        self._pending_value: float | None = None
+        self._debounce_task: asyncio.Task | None = None
 
     def combined_firmware_version(self) -> str | None:
         """Return combined firmware version string."""
@@ -88,14 +96,11 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
             return version
         return None
 
-
     @property
     def device_info(self):
         """Return device information."""
-        # Always get the latest firmware version from coordinator
         sw_version = self.combined_firmware_version()
         
-        # Base device data - always include these
         device_data = {
             "identifiers": {(DOMAIN, f"aduro_{self.coordinator.entry.entry_id}")},
             "name": f"Aduro {self.coordinator.stove_model}",
@@ -103,8 +108,6 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
             "model": f"Hybrid {self.coordinator.stove_model}",
         }
         
-        # ALWAYS include sw_version, even if None initially
-        # This ensures the device registry entry has the field
         device_data["sw_version"] = sw_version
         
         return device_data
@@ -112,24 +115,47 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        # Only unavailable if coordinator failed to update (connection lost)
         if not self.coordinator.last_update_success:
             return False
         
-        # Check if stove IP is available (indicates connectivity)
         if not self.coordinator.stove_ip:
             return False
         
         return True
 
-    def _get_cached_value(self, current_value, default=None):
-        """Return current value or last cached value if current is None."""
-        if current_value is not None:
-            self._last_valid_value = current_value
-            return current_value
+    async def _debounced_set_value(self, value: float, delay: float = DEBOUNCE_DELAY) -> None:
+        """Set value with debouncing - waits for user to stop changing."""
+        # Cancel any existing debounce task
+        if self._debounce_task and not self._debounce_task.done():
+            self._debounce_task.cancel()
+            _LOGGER.debug("%s: Cancelled previous debounce task", self._attr_name)
         
-        # Return last valid value if we have one, otherwise default
-        return self._last_valid_value if self._last_valid_value is not None else default
+        # Store the pending value
+        self._pending_value = value
+        
+        # Immediately update the UI to show the new value
+        self.async_write_ha_state()
+        
+        # Create new debounce task
+        async def _send_after_delay():
+            try:
+                await asyncio.sleep(delay)
+                _LOGGER.info(
+                    "%s: Debounce complete, sending value: %s",
+                    self._attr_name,
+                    self._pending_value
+                )
+                await self._actually_set_value(self._pending_value)
+                self._pending_value = None
+            except asyncio.CancelledError:
+                _LOGGER.debug("%s: Debounce task cancelled", self._attr_name)
+                raise
+        
+        self._debounce_task = asyncio.create_task(_send_after_delay())
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Actually send the value to the device - override in subclasses."""
+        raise NotImplementedError
 
 
 class AduroHeatlevelNumber(AduroNumberBase):
@@ -147,6 +173,10 @@ class AduroHeatlevelNumber(AduroNumberBase):
     @property
     def native_value(self) -> float | None:
         """Return the current heat level."""
+        # Show pending value first (immediate UI update)
+        if self._pending_value is not None:
+            return self._pending_value
+        
         # Show target while changing
         if self.coordinator._change_in_progress and self.coordinator._target_heatlevel is not None:
             return self.coordinator._target_heatlevel
@@ -165,20 +195,34 @@ class AduroHeatlevelNumber(AduroNumberBase):
         heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
         from .const import HEAT_LEVEL_DISPLAY
         
-        return {
+        attrs = {
             "display": HEAT_LEVEL_DISPLAY.get(heatlevel, str(heatlevel)),
             "operation_mode": self.coordinator.data.get("status", {}).get("operation_mode", 0),
         }
+        
+        # Show if change is pending
+        if self._pending_value is not None:
+            attrs["pending_change"] = True
+            attrs["pending_value"] = self._pending_value
+        
+        return attrs
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the heat level."""
+        """Set the heat level with debouncing."""
         heatlevel = int(value)
-        _LOGGER.info("Number: Setting heat level to %s", heatlevel)
+        _LOGGER.debug("Number: Heat level change requested: %s", heatlevel)
+        
+        # Use debouncing for slider changes
+        await self._debounced_set_value(float(heatlevel))
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Actually send the heat level to the stove."""
+        heatlevel = int(value)
+        _LOGGER.info("Number: Actually setting heat level to %s", heatlevel)
         
         success = await self.coordinator.async_set_heatlevel(heatlevel)
         
         if success:
-            # Request immediate update
             await self.coordinator.async_request_refresh()
         else:
             _LOGGER.error("Number: Failed to set heat level to %s", heatlevel)
@@ -200,6 +244,15 @@ class AduroTemperatureNumber(AduroNumberBase):
     @property
     def native_value(self) -> float | None:
         """Return the current target temperature."""
+        # Show pending value first (immediate UI update)
+        if self._pending_value is not None:
+            return self._pending_value
+        
+        # Show target while changing
+        if self.coordinator._change_in_progress and self.coordinator._target_temperature is not None:
+            return self.coordinator._target_temperature
+        
+        # Show actual value from stove
         if self.coordinator.data and "operating" in self.coordinator.data:
             return self.coordinator.data["operating"].get("boiler_ref")
         return None
@@ -210,20 +263,34 @@ class AduroTemperatureNumber(AduroNumberBase):
         if not self.coordinator.data or "operating" not in self.coordinator.data:
             return {}
         
-        return {
+        attrs = {
             "current_temp": self.coordinator.data["operating"].get("boiler_temp"),
             "operation_mode": self.coordinator.data.get("status", {}).get("operation_mode", 0),
         }
+        
+        # Show if change is pending
+        if self._pending_value is not None:
+            attrs["pending_change"] = True
+            attrs["pending_value"] = self._pending_value
+        
+        return attrs
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the target temperature."""
+        """Set the target temperature with debouncing."""
         temperature = float(value)
-        _LOGGER.info("Number: Setting target temperature to %s°C", temperature)
+        _LOGGER.debug("Number: Temperature change requested: %s°C", temperature)
+        
+        # Use debouncing for slider changes
+        await self._debounced_set_value(temperature)
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Actually send the temperature to the stove."""
+        temperature = float(value)
+        _LOGGER.info("Number: Actually setting target temperature to %s°C", temperature)
         
         success = await self.coordinator.async_set_temperature(temperature)
         
         if success:
-            # Request immediate update
             await self.coordinator.async_request_refresh()
         else:
             _LOGGER.error("Number: Failed to set temperature to %s°C", temperature)
@@ -264,14 +331,16 @@ class AduroPelletCapacityNumber(AduroNumberBase):
         }
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the pellet capacity."""
+        """Set the pellet capacity - no debouncing needed for config values."""
         capacity = float(value)
         _LOGGER.info("Number: Setting pellet capacity to %s kg", capacity)
         
         self.coordinator.set_pellet_capacity(capacity)
-        
-        # Request immediate update
         await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - capacity changes are immediate."""
+        pass
 
 
 class AduroNotificationLevelNumber(AduroNumberBase):
@@ -311,14 +380,16 @@ class AduroNotificationLevelNumber(AduroNumberBase):
         }
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the notification level."""
+        """Set the notification level - no debouncing needed for config values."""
         level = float(value)
         _LOGGER.info("Number: Setting notification level to %s%%", level)
         
         self.coordinator.set_notification_level(level)
-        
-        # Request immediate update
         await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - notification level changes are immediate."""
+        pass
 
 
 class AduroShutdownLevelNumber(AduroNumberBase):
@@ -359,11 +430,13 @@ class AduroShutdownLevelNumber(AduroNumberBase):
         }
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the shutdown level."""
+        """Set the shutdown level - no debouncing needed for config values."""
         level = float(value)
         _LOGGER.info("Number: Setting shutdown level to %s%%", level)
         
         self.coordinator.set_shutdown_level(level)
-        
-        # Request immediate update
         await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - shutdown level changes are immediate."""
+        pass

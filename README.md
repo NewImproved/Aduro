@@ -424,7 +424,7 @@ This project incorporates code from:
 - [pyduro](https://github.com/clementprevot/pyduro) by Clément Prévot (MIT License)
 - [homeassistant_aduro_stove_control_python_scripts](https://github.com/SpaceTeddy/homeassistant_aduro_stove_control_python_scripts) by SpaceTeddy (GPL-2.0 license)
 
-See [NOTICE]([NOTICE](https://github.com/NewImproved/Aduro/edit/main/NOTICE.md)) file for full third-party attribution details.
+See [NOTICE](https://github.com/NewImproved/Aduro/edit/main/NOTICE.md) file for full third-party attribution details.
 
 ## Disclaimer
 

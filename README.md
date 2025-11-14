@@ -297,32 +297,6 @@ automation:
           temperature: 18
 ```
 
-## Lovelace Card Example
-
-```yaml
-type: entities
-title: Aduro Stove
-entities:
-  - entity: switch.aduro_h2_power
-    name: Power
-  - entity: sensor.aduro_h2_status
-    name: Status
-  - entity: sensor.aduro_h2_room_temperature
-    name: Room Temp
-  - entity: number.aduro_h2_heatlevel
-    name: Heat Level
-  - entity: number.aduro_h2_target_temperature
-    name: Target Temp
-  - type: section
-    label: Pellets
-  - entity: sensor.aduro_h2_pellets_percentage
-    name: Remaining
-  - entity: sensor.aduro_h2_todays_consumption
-    name: Today
-  - entity: button.aduro_h2_refill_pellets
-    name: Mark Refilled
-```
-
 ## Troubleshooting
 
 ### Stove Not Found

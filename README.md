@@ -416,7 +416,24 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 - Get confirmation/information about the remaining Aduro hybrid stoves.
 - Estimation of pellets consumption over time, depending on temperature settings, heat level settings, outside temperature and other relevant factors to estimate a time for when the stove have consumed all pellets.
 - A similar function of Aduro Smart Response, that can give pointers when using firewood.
-- External and wireless temperature sensor is available as an accessory. Could it be possible to use other temperature sensors and send the information to the stove via Home Assistant?
+- External and wireless temperature sensor is available as an accessory. Could it be possible to use other temperature sensors and send the information to the stove via Home Assistant
+
+## Aduro Stove Card
+
+A custom and optional Lovelace card for controlling Aduro Hybrid Stoves in Home Assistant can be found here: [Aduro Stove Card](https://github.com/NewImproved/Aduro-Stove-Card)
+
+![Aduro Stove Card](Aduro_stove_card.png)
+
+### Features
+
+- **Real-time Status Display** - Shows current stove state and operation mode
+- **Temperature & Heat Level Control** - Easy +/- buttons for quick adjustments
+- **Pellet Monitoring** - Visual pellet level indicator with refill counter
+- **Power Control** - Start/stop the stove with a single tap
+- **Mode Toggle** - Switch between Heat Level and Temperature modes
+- **Auto-Resume & Auto-Shutdown** - Configure automatic behavior for wood mode and low pellet levels
+- **Maintenance Tracking** - Quick access to pellet refill and stove cleaning buttons
+- **Change Indicator** - Visual feedback when stove settings are updating
 
 
 ## Credits

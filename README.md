@@ -422,7 +422,7 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 
 A custom and optional Lovelace card for controlling Aduro Hybrid Stoves in Home Assistant can be found here: [Aduro Stove Card](https://github.com/NewImproved/Aduro-Stove-Card)
 
-![Aduro Stove Card](Aduro_stove_card.png)
+![Aduro Stove Card](https://github.com/NewImproved/Aduro-Stove-Card/blob/main/Aduro_stove_card.png)
 
 ### Features
 

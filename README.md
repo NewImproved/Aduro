@@ -22,8 +22,15 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 - External change detection (sync with mobile app)
 - Wood mode support with automatic resume
 
+🌡️ **Temperature Monitoring & Alerts**
+- High smoke temperature alert (350-500°C, configurable)
+- Low wood mode temperature alert (20-200°C, configurable)
+- Customizable duration of time before alert (1-30 minutes)
+- Real-time temperature monitoring with hysteresis
+- Prevent dangerous overheating for all modes and fire extinction during wood mode
+
 📊 **Comprehensive Monitoring**
-- 40+ sensors (temperatures, power, pellets, consumption)
+- 42+ sensors (temperatures, power, pellets, consumption, alerts)
 - Real-time state and status tracking
 - Operating time statistics
 - Network information (WiFi signal, IP address)
@@ -89,26 +96,46 @@ If you can confirm that the integration work for a stove, please let me know via
 1. Go to **Settings** → **Devices & Services**
 2. Click **"+ ADD INTEGRATION"**
 3. Search for **"Aduro Hybrid Stove"**
-4. Follow the configuration wizard:
-   - **Stove Model**: Select your model (H1-H6)
+4. Enter only 3 required details:
    - **Serial Number**: Your stove's serial number
    - **PIN Code**: Your stove's PIN code
+   - **Stove Model**: Select your model (H1-H6)
 
 The integration will automatically:
 - Discover your stove on the network
 - Create all entities
+- Use sensible defaults for all settings
 
-### Reconfiguration
+### Optional Configuration
 
-To change settings later:
+To customize settings after setup:
 1. Go to **Settings** → **Devices & Services**
 2. Find **Aduro Hybrid Stove**
 3. Click **"CONFIGURE"**
-4. Update settings as needed
+4. Choose from three configuration areas:
+
+#### Pellet Settings
+- Pellet container capacity (kg)
+- Low pellet notification level (%)
+- Auto-shutdown level (%)
+- Enable/disable automatic shutdown
+
+#### Temperature Alerts ⭐ NEW
+- **High Smoke Temperature Alert**
+  - Threshold: 350-500°C (default: 425°C)
+  - Duration threshold: 1-30 minutes (default: 30 seconds)
+  - Alerts when smoke temperature is dangerously high
+- **Low Wood Mode Temperature Alert**
+  - Threshold: 20-200°C (default: 175°C)
+  - Duration threshold: 1-30 minutes (default: 5 minutes)
+  - Alerts when wood fire might be going out
+
+#### Advanced Settings
+- Auto-resume after wood mode
 
 ## Entities
 
-### Sensors (40)
+### Sensors (42)
 
 #### Status & Operation
 - **Status** - Main status (Operating II, Stopped, etc.)
@@ -124,6 +151,19 @@ To change settings later:
 - **Target Temperature** - Temperature setpoint
 - **Smoke Temperature** - Exhaust temperature
 - **Shaft Temperature** - Shaft temperature
+
+#### Temperature Alerts
+- **High Smoke Temperature Alert** - Alert status with attributes
+  - `alert_active` - Boolean alert state
+  - `current_temp` - Current smoke temperature
+  - `threshold_temp` - Configured threshold
+  - `threshold_duration_seconds` - Alert duration
+- **Low Wood Temperature Alert** - Alert status with attributes
+  - `alert_active` - Boolean alert state
+  - `in_wood_mode` - Wood mode status
+  - `current_temp` - Current shaft temperature
+  - `threshold_temp` - Configured threshold
+  - `threshold_duration_seconds` - Alert duration
 
 #### Power
 - **Power Output** - Power in kW
@@ -167,13 +207,22 @@ To change settings later:
 - **Auto Shutdown at Low Pellets** - Enable automatic shutdown
 - **Auto Resume After Wood Mode** - Enable automatic resume
 
-### Numbers (5)
+### Numbers (9)
 
+#### Heat Control
 - **Heat Level** - Set heat level (1-3)
 - **Target Temperature** - Set temperature (5-35°C)
+
+#### Pellet Configuration
 - **Pellet Capacity** - Configure hopper capacity (8-25 kg)
 - **Low Pellet Notification Level** - Warning threshold (%)
 - **Auto-Shutdown Pellet Level** - Shutdown threshold (%)
+
+#### Temperature Alert Configuration
+- **High Smoke Temp Alert Threshold** - Alert threshold (350-500°C)
+- **High Smoke Temp Alert Duration threshold** - Alert duration threshold (60-1800 seconds)
+- **Low Wood Temp Alert Threshold** - Alert threshold (20-200°C)
+- **Low Wood Temp Alert Duration threshold** - Alert duration threshold (60-1800 seconds)
 
 ### Buttons (5)
 
@@ -297,6 +346,65 @@ automation:
           temperature: 18
 ```
 
+### High Smoke Temperature Alert
+
+```yaml
+automation:
+  - alias: "High Smoke Temperature Alert"
+    trigger:
+      - platform: state
+        entity_id: sensor.aduro_h2_high_smoke_temperature_alert
+        to: "Alert"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "⚠️ Stove High Temperature Alert"
+          message: >
+            Smoke temperature too high!
+            Current: {{ state_attr('sensor.aduro_h2_high_smoke_temperature_alert', 'current_temp') }}°C
+            Threshold: {{ state_attr('sensor.aduro_h2_high_smoke_temperature_alert', 'threshold_temp') }}°C
+          data:
+            priority: high
+```
+
+### Low Wood Mode Temperature Alert
+
+```yaml
+automation:
+  - alias: "Low Wood Temperature Alert"
+    trigger:
+      - platform: state
+        entity_id: sensor.aduro_h2_low_wood_temperature_alert
+        to: "Alert"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🔥 Add Wood to Stove"
+          message: >
+            Temperature too low in wood mode!
+            Current: {{ state_attr('sensor.aduro_h2_low_wood_temperature_alert', 'current_temp') }}°C
+            The fire may be going out.
+          data:
+            priority: high
+```
+
+### Temperature Alert Cleared
+
+```yaml
+automation:
+  - alias: "Stove Temperature Alert Cleared"
+    trigger:
+      - platform: state
+        entity_id: sensor.aduro_h2_high_smoke_temperature_alert
+        from: "Alert"
+        to: "OK"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "✅ Stove Alert Cleared"
+          message: "Smoke temperature has returned to normal"
+```
+
 ## Troubleshooting
 
 ### Stove Not Found
@@ -310,6 +418,13 @@ automation:
 - Check Home Assistant logs for errors
 - Ensure stove is not in wood mode (state 9 or 14)
 - Try restarting the integration
+
+### Temperature Alerts Not Triggering
+
+- Verify smoke and shaft temperature sensors are working
+- Check that alert thresholds are appropriate for your stove
+- Review logs for temperature detection messages
+- Default thresholds (425°C for high smoke, 175°C for low wood) may need adjustment
 
 ### Unknown States
 
@@ -335,7 +450,7 @@ logger:
 If you're migrating from the manual YAML configuration:
 
 1. **Backup** your current configuration
-2. **Remove** old automations using `python_script.exec`
+2. **Remove** old automations and files using `python_script.exec`
 3. **Remove** old template sensors
 4. **Install** this integration
 5. **Configure** via UI
@@ -349,6 +464,7 @@ The integration preserves all functionality:
 - ✅ Timer countdowns
 - ✅ Auto start/stop detection
 - ✅ Wood mode support
+- ✅ Temperature monitoring and alerts
 
 ## Contributing
 
@@ -381,14 +497,12 @@ If your stove reports states not in the integration:
 
 See [ADDING_STATES.md](ADDING_STATES.md) for details.
 
-
 ## Development plans/wish list
 
 - For Alpha-releases: test that all functions are working as intended.
 - Update integration with all relevant translations between state/substates-numbers and their related text string.
 - Get confirmation/information about the remaining Aduro hybrid stoves.
 - Estimation of pellets consumption over time, depending on temperature settings, heat level settings, outside temperature and other relevant factors to estimate a time for when the stove have consumed all pellets.
-- A similar function of Aduro Smart Response, that can give pointers when using firewood.
 - External and wireless temperature sensor is available as an accessory. Could it be possible to use other temperature sensors and send the information to the stove via Home Assistant?
 
 ## Aduro Stove Card
@@ -408,14 +522,12 @@ A custom and optional Lovelace card for controlling Aduro Hybrid Stoves in Home 
 - **Maintenance Tracking** - Quick access to pellet refill and stove cleaning buttons
 - **Change Indicator** - Visual feedback when stove settings are updating
 
-
 ## Credits
 
 This integration is built upon the excellent work of:
 
 - **[Clément Prévot](https://github.com/clementprevot)** - Creator of [pyduro](https://github.com/clementprevot/pyduro), the Python library for controlling Aduro hybrid stoves
 - **[SpaceTeddy](https://github.com/SpaceTeddy)** - Creator of [Home Assistant Aduro stove control scripts](https://github.com/SpaceTeddy/homeassistant_aduro_stove_control_python_scripts)
-
 
 ## License
 

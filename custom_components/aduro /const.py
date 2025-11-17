@@ -119,12 +119,21 @@ STATE_NAMES: Final = {
     "5": "state_operating",
     "6": "state_stopped",
     "9": "state_off",
+    "11": "state_stopped_draft",
     "13": "state_stopped",
     "14": "state_off",
+    "15": "state_stopped_smoke_sensor",
+    "17": "state_stopped_dropshaft",
+    "18": "state_stopped_burner_yellow",
+    "19": "state_stopped_auger",
     "20": "state_stopped",
+    "23": "state_stopped_timer",
+    "24": "state_operating_air_damper",
     "28": "state_stopped",
     "32": "state_operating_iii",
+    "33": "state_stopped_co_sensor",
     "34": "state_stopped",
+    "35": "state_stopped_no_fan",
 }
 
 # Substate descriptions - Keys for translation
@@ -135,6 +144,7 @@ SUBSTATE_NAMES: Final = {
     "5": "substate_normal",
     "6": "substate_temp_reached",
     "9": "substate_wood_burning",
+    "11": "substate_dropshaft_hot",
     "13": "substate_failed_ignition",
     "14_0": "substate_by_button",
     "14_1": "substate_wood_burning_question",
@@ -152,17 +162,26 @@ STATE_NAMES_DISPLAY: Final = {
     "5": "Operating {heatlevel}",
     "6": "Stopped",
     "9": "Off",
+    "11": "Dropshaft hot"
     "13": "Stopped",
     "14": "Off",
+    "15": "Bad smoke sensor",
+    "17": "Bad dropshaft sensor",
+    "18": "Check burner yellow",
+    "19": "bad external auger output",
     "20": "Stopped",
+    "23": "Stopped by timer",
+    "24": "Air damper closed",
     "28": "Stopped",
     "32": "Operating III",
+    "33": "Co sensor defect",
     "34": "Stopped",
+    "35": "No power consumption for fan",
 }
 
 SUBSTATE_NAMES_DISPLAY: Final = {
-    "0": "Waiting",
-    "2": "Ignition 1",
+    "0": "Wait",
+    "2": "Ignition",
     "4": "Ignition 2",
     "5": "Normal",
     "6": "Room temperature reached",
@@ -177,8 +196,8 @@ SUBSTATE_NAMES_DISPLAY: Final = {
 }
 
 # State classifications
-STARTUP_STATES: Final = ["0", "2", "4", "5", "32"]
-SHUTDOWN_STATES: Final = ["6", "9", "13", "14", "20", "28", "34"]
+STARTUP_STATES: Final = ["0", "2", "4", "5", "24", "32"]
+SHUTDOWN_STATES: Final = ["6", "9", "11", "13", "14", "15", "17", "18", "19", "20", "23", "28", "33", "34", "35"]
 
 # For backward compatibility and additional detail
 STOVE_STATES_ON: Final = STARTUP_STATES

@@ -87,10 +87,15 @@ async def async_setup_entry(
         AduroOperatingTimeIgnitionSensor(coordinator, entry),
         
         # Calculated/status sensors
+        AduroModeTransitionSensor(coordinator, entry),
         AduroChangeInProgressSensor(coordinator, entry),
         AduroDisplayFormatSensor(coordinator, entry),
         AduroDisplayTargetSensor(coordinator, entry),
         AduroAppChangeDetectedSensor(coordinator, entry),
+
+        # Temperature alert sensors
+        AduroHighSmokeTempAlertSensor(coordinator, entry),
+        AduroLowWoodTempAlertSensor(coordinator, entry),
     ]
 
     async_add_entities(sensors)
@@ -860,6 +865,22 @@ class AduroOperatingTimeIgnitionSensor(AduroSensorBase):
 # =============================================================================
 
 
+class AduroModeTransitionSensor(AduroSensorBase):
+    """Sensor for mode transition state."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "mode_transition", "Mode Transition")
+        self._attr_icon = "mdi:state-machine"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the mode transition state."""
+        if self.coordinator.data and "calculated" in self.coordinator.data:
+            return self.coordinator.data["calculated"].get("mode_transition", "idle")
+        return "idle"
+
+
 class AduroChangeInProgressSensor(AduroSensorBase):
     """Sensor for change in progress status."""
 
@@ -954,3 +975,135 @@ class AduroAppChangeDetectedSensor(AduroSensorBase):
             detected = self.coordinator.data.get("app_change_detected", False)
             return "true" if detected else "false"
         return "false"
+
+# =============================================================================
+# Temperature alert Sensors
+# =============================================================================
+
+class AduroHighSmokeTempAlertSensor(AduroSensorBase):
+    """Binary sensor for high smoke temperature alert."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "high_smoke_temp_alert", "High Smoke Temperature Alert")
+        self._attr_icon = "mdi:alert-circle"
+
+    @property
+    def native_value(self) -> str:
+        """Return alert status as text."""
+        if self.coordinator.data and "alerts" in self.coordinator.data:
+            alert_info = self.coordinator.data["alerts"].get("high_smoke_temp_alert", {})
+            return "Alert" if alert_info.get("active", False) else "OK"
+        return "OK"
+
+    @property
+    def icon(self) -> str:
+        """Return icon based on alert state."""
+        if self.coordinator.data and "alerts" in self.coordinator.data:
+            alert_info = self.coordinator.data["alerts"].get("high_smoke_temp_alert", {})
+            if alert_info.get("active", False):
+                return "mdi:alert-circle"
+        return "mdi:alert-circle-check-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if not self.coordinator.data or "alerts" not in self.coordinator.data:
+            return {}
+        
+        alert_info = self.coordinator.data["alerts"].get("high_smoke_temp_alert", {})
+        
+        attrs = {
+            "alert_active": alert_info.get("active", False),
+            "current_temp": alert_info.get("current_temp", 0),
+            "threshold_temp": alert_info.get("threshold_temp", 0),
+            "threshold_duration_seconds": alert_info.get("threshold_duration", 0),
+            "threshold_duration_minutes": round(alert_info.get("threshold_duration", 0) / 60, 1),
+        }
+        
+        # Add time information if available
+        time_info = alert_info.get("time_info")
+        if time_info:
+            attrs["time_state"] = time_info["state"]
+            attrs["elapsed_seconds"] = time_info["elapsed"]
+            attrs["elapsed_minutes"] = round(time_info["elapsed"] / 60, 1)
+            
+            if time_info["state"] == "building":
+                attrs["remaining_seconds"] = time_info["remaining"]
+                attrs["remaining_minutes"] = round(time_info["remaining"] / 60, 1)
+                attrs["progress_percent"] = round(
+                    (time_info["elapsed"] / alert_info.get("threshold_duration", 1)) * 100, 1
+                )
+            elif time_info["state"] == "exceeded":
+                attrs["exceeded_by_seconds"] = time_info["exceeded_by"]
+                attrs["exceeded_by_minutes"] = round(time_info["exceeded_by"] / 60, 1)
+        
+        return attrs
+
+
+class AduroLowWoodTempAlertSensor(AduroSensorBase):
+    """Binary sensor for low wood mode temperature alert."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "low_wood_temp_alert", "Low Wood Temperature Alert")
+        self._attr_icon = "mdi:alert-circle"
+
+    @property
+    def native_value(self) -> str:
+        """Return alert status as text."""
+        if self.coordinator.data and "alerts" in self.coordinator.data:
+            alert_info = self.coordinator.data["alerts"].get("low_wood_temp_alert", {})
+            # Only show alert if in wood mode
+            if alert_info.get("in_wood_mode", False) and alert_info.get("active", False):
+                return "Alert"
+            elif alert_info.get("in_wood_mode", False):
+                return "Monitoring"
+        return "N/A"
+
+    @property
+    def icon(self) -> str:
+        """Return icon based on alert state."""
+        if self.coordinator.data and "alerts" in self.coordinator.data:
+            alert_info = self.coordinator.data["alerts"].get("low_wood_temp_alert", {})
+            if alert_info.get("in_wood_mode", False):
+                if alert_info.get("active", False):
+                    return "mdi:alert-circle"
+                return "mdi:thermometer-low"
+        return "mdi:help-circle-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if not self.coordinator.data or "alerts" not in self.coordinator.data:
+            return {}
+        
+        alert_info = self.coordinator.data["alerts"].get("low_wood_temp_alert", {})
+        
+        attrs = {
+            "alert_active": alert_info.get("active", False),
+            "in_wood_mode": alert_info.get("in_wood_mode", False),
+            "current_temp": alert_info.get("current_temp", 0),
+            "threshold_temp": alert_info.get("threshold_temp", 0),
+            "threshold_duration_seconds": alert_info.get("threshold_duration", 0),
+            "threshold_duration_minutes": round(alert_info.get("threshold_duration", 0) / 60, 1),
+        }
+        
+        # Add time information if available
+        time_info = alert_info.get("time_info")
+        if time_info:
+            attrs["time_state"] = time_info["state"]
+            attrs["elapsed_seconds"] = time_info["elapsed"]
+            attrs["elapsed_minutes"] = round(time_info["elapsed"] / 60, 1)
+            
+            if time_info["state"] == "building":
+                attrs["remaining_seconds"] = time_info["remaining"]
+                attrs["remaining_minutes"] = round(time_info["remaining"] / 60, 1)
+                attrs["progress_percent"] = round(
+                    (time_info["elapsed"] / alert_info.get("threshold_duration", 1)) * 100, 1
+                )
+            elif time_info["state"] == "exceeded":
+                attrs["exceeded_by_seconds"] = time_info["exceeded_by"]
+                attrs["exceeded_by_minutes"] = round(time_info["exceeded_by"] / 60, 1)
+        
+        return attrs

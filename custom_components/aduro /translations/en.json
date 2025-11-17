@@ -2,24 +2,20 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure Aduro Hybrid Stove",
-        "description": "Set up your Aduro stove integration",
+        "title": "Set up Aduro Hybrid Stove",
+        "description": "Enter your stove connection details",
         "data": {
-          "stove_model": "Stove Model",
           "stove_serial": "Stove Serial Number",
-          "stove_pin": "Stove PIN Code"
-        },
-        "data_description": {
-          "stove_model": "Select your Aduro stove model (H1, H2, H3, H4, H5, or H6)",
-          "stove_serial": "The serial number found on your stove",
-          "stove_pin": "The PIN code for your stove"
+          "stove_pin": "Stove PIN",
+          "stove_model": "Stove Model"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to the stove",
-      "invalid_auth": "Invalid authentication credentials",
-      "unknown": "Unexpected error occurred"
+      "missing_serial": "Serial number is required",
+      "missing_pin": "PIN is required",
+      "cannot_connect": "Failed to connect",
+      "unknown": "Unexpected error"
     },
     "abort": {
       "already_configured": "This stove is already configured"
@@ -28,13 +24,54 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configure Aduro Options",
-        "description": "Update your Aduro stove settings",
+        "title": "Configure Aduro Stove",
+        "description": "Choose a configuration area",
+        "menu_options": {
+          "pellet_settings": "Pellet Settings",
+          "temperature_alerts": "Temperature Alerts",
+          "advanced_settings": "Advanced Settings"
+        }
+      },
+      "pellet_settings": {
+        "title": "Pellet Configuration",
+        "description": "Configure pellet container and low pellet alerts",
         "data": {
-          "stove_model": "Stove Model"
+          "pellet_capacity": "Pellet Container Capacity (kg)",
+          "notification_level": "Low Pellet Notification Level (%)",
+          "shutdown_level": "Auto-Shutdown Level (%)",
+          "auto_shutdown_enabled": "Enable Auto-Shutdown"
         },
         "data_description": {
-          "stove_model": "Change your stove model if needed"
+          "pellet_capacity": "Total capacity of your pellet container in kilograms",
+          "notification_level": "Receive a notification when pellets drop below this percentage",
+          "shutdown_level": "Automatically shutdown stove when pellets drop below this percentage",
+          "auto_shutdown_enabled": "Allow the stove to automatically shutdown at low pellet level"
+        }
+      },
+      "temperature_alerts": {
+        "title": "Temperature Alert Configuration",
+        "description": "Configure temperature monitoring and alerts",
+        "data": {
+          "high_smoke_temp_threshold": "High Smoke Temperature Threshold (°C)",
+          "high_smoke_duration_threshold": "High Smoke Alert Duration (seconds)",
+          "low_wood_temp_threshold": "Low Wood Mode Temperature Threshold (°C)",
+          "low_wood_duration_threshold": "Low Wood Mode Alert Duration (seconds)"
+        },
+        "data_description": {
+          "high_smoke_temp_threshold": "Trigger alert when smoke temperature exceeds this value",
+          "high_smoke_duration_threshold": "Time in seconds temperature must exceed threshold before alerting",
+          "low_wood_temp_threshold": "Trigger alert when wood mode temperature drops below this value",
+          "low_wood_duration_threshold": "Time in seconds temperature must be low before alerting"
+        }
+      },
+      "advanced_settings": {
+        "title": "Advanced Settings",
+        "description": "Configure advanced stove behaviors",
+        "data": {
+          "auto_resume_after_wood": "Auto-Resume After Wood Mode"
+        },
+        "data_description": {
+          "auto_resume_after_wood": "Automatically resume pellet operation with previous settings when exiting wood mode"
         }
       }
     }

@@ -91,6 +91,12 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._shutdown_notification_sent = False
         self._low_pellet_notification_sent = False
         
+        # Daily consumption tracking for pellet calculation
+        self._consumption_at_refill = 0.0  # Daily consumption when refilled
+        self._days_since_refill = 0  # Track day changes
+        self._last_consumption_day: date | None = None  # Track which day we're on
+        self._accumulated_consumption = 0.0  # Running total since refill
+        
         # Wood mode tracking
         self._auto_resume_after_wood = False  # User preference
         self._was_in_wood_mode = False
@@ -99,7 +105,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._pre_wood_mode_operation_mode: int | None = None
 
         # Temperature alert tracking
-        self._high_smoke_temp_threshold = 425.0  # °C
+        self._high_smoke_temp_threshold = 420.0  # °C
         self._high_smoke_duration_threshold = 30  # seconds
         self._high_smoke_temp_start_time: datetime | None = None
         self._high_smoke_alert_active = False
@@ -547,6 +553,64 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     def _calculate_pellet_levels(self, data: dict[str, Any]) -> None:
         """Calculate pellet levels and remaining amount."""
+        from datetime import date
+        
+        # Update consumed pellets based on daily consumption
+        if "consumption" in data:
+            today_consumption = data["consumption"].get("day", 0)
+            current_day = date.today()
+            
+            # Initialize on first run
+            if self._last_consumption_day is None:
+                self._last_consumption_day = current_day
+                self._consumption_at_refill = today_consumption
+                self._accumulated_consumption = 0.0
+                _LOGGER.debug(
+                    "Initialized daily consumption tracking: today=%.2f kg, date=%s",
+                    today_consumption,
+                    current_day
+                )
+            
+            # Check if day changed (midnight rollover)
+            if current_day != self._last_consumption_day:
+                _LOGGER.info(
+                    "Day changed from %s to %s, adding yesterday's consumption to accumulated total",
+                    self._last_consumption_day,
+                    current_day
+                )
+                
+                # Get yesterday's consumption from data
+                yesterday_consumption = data["consumption"].get("yesterday", 0)
+                
+                # Add completed day's consumption to accumulated total
+                self._accumulated_consumption += yesterday_consumption
+                
+                # Reset baseline for new day
+                self._consumption_at_refill = 0.0
+                self._last_consumption_day = current_day
+                self._days_since_refill += 1
+                
+                _LOGGER.debug(
+                    "New day started - accumulated: %.2f kg, days since refill: %d",
+                    self._accumulated_consumption,
+                    self._days_since_refill
+                )
+            
+            # Calculate today's consumption since refill (or since midnight)
+            today_since_baseline = max(0, today_consumption - self._consumption_at_refill)
+            
+            # Total consumed = accumulated from previous days + today's consumption
+            self._pellets_consumed = self._accumulated_consumption + today_since_baseline
+            
+            _LOGGER.debug(
+                "Pellet consumption: %.2f kg (accumulated: %.2f kg, today: %.2f kg, baseline: %.2f kg)",
+                self._pellets_consumed,
+                self._accumulated_consumption,
+                today_since_baseline,
+                self._consumption_at_refill
+            )
+        
+        # Calculate remaining pellets
         amount_remaining = self._pellet_capacity - self._pellets_consumed
         percentage_remaining = ((self._pellet_capacity - self._pellets_consumed) / 
                                self._pellet_capacity * 100) if self._pellet_capacity > 0 else 0
@@ -560,6 +624,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             "notification_level": self._notification_level,
             "shutdown_level": self._shutdown_level,
             "auto_shutdown_enabled": self._auto_shutdown_enabled,
+            "days_since_refill": self._days_since_refill,  # Extra info
         }
         
         data["pellets"] = pellets
@@ -980,11 +1045,33 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     def refill_pellets(self) -> None:
         """Reset pellet consumption after refilling."""
+        from datetime import date
+        
+        # Get current daily consumption to use as new baseline
+        if self.data and "consumption" in self.data:
+            today_consumption = self.data["consumption"].get("day", 0)
+            self._consumption_at_refill = today_consumption
+            _LOGGER.info(
+                "Pellets refilled, baseline set to today's consumption: %.2f kg",
+                today_consumption
+            )
+        else:
+            self._consumption_at_refill = 0.0
+        
+        # Reset all tracking
         self._pellets_consumed = 0.0
+        self._accumulated_consumption = 0.0
+        self._days_since_refill = 0
+        self._last_consumption_day = date.today()
         self._refill_counter += 1
         self._low_pellet_notification_sent = False
         self._shutdown_notification_sent = False
-        _LOGGER.info("Pellets refilled, counter: %d", self._refill_counter)
+        
+        _LOGGER.info(
+            "Pellets refilled, counter: %d, starting fresh from day: %s",
+            self._refill_counter,
+            self._last_consumption_day
+        )
 
     def reset_refill_counter(self) -> None:
         """Reset refill counter after cleaning."""
@@ -1335,7 +1422,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         return False
 
 
-    def _check_temperature_alerts(self, data: dict[str, Any]) -> None:
+    async def _check_temperature_alerts(self, data: dict[str, Any]) -> None:
         """Check for temperature alert conditions."""
         if "operating" not in data:
             return

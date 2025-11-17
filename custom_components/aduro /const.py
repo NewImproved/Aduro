@@ -34,6 +34,27 @@ DEFAULT_CAPACITY_PELLETS: Final = 9.1
 DEFAULT_NOTIFICATION_LEVEL: Final = 10
 DEFAULT_SHUTDOWN_LEVEL: Final = 5
 
+# Temperature Alert Defaults
+DEFAULT_HIGH_SMOKE_TEMP: Final = 420  # °C
+DEFAULT_HIGH_SMOKE_DURATION: Final = 30  # seconds
+DEFAULT_LOW_WOOD_TEMP: Final = 175  # °C
+DEFAULT_LOW_WOOD_DURATION: Final = 300  # seconds (5 minutes)
+
+# Temperature Alert Limits
+HIGH_SMOKE_TEMP_MIN: Final = 350
+HIGH_SMOKE_TEMP_MAX: Final = 500
+HIGH_SMOKE_TEMP_STEP: Final = 10
+HIGH_SMOKE_DURATION_MIN: Final = 60  # 1 minute
+HIGH_SMOKE_DURATION_MAX: Final = 1800  # 30 minutes
+HIGH_SMOKE_DURATION_STEP: Final = 60  # 1 minute steps
+
+LOW_WOOD_TEMP_MIN: Final = 20
+LOW_WOOD_TEMP_MAX: Final = 200
+LOW_WOOD_TEMP_STEP: Final = 5
+LOW_WOOD_DURATION_MIN: Final = 60  # 1 minute
+LOW_WOOD_DURATION_MAX: Final = 1800  # 30 minutes
+LOW_WOOD_DURATION_STEP: Final = 60  # 1 minute steps
+
 # Stove operation modes
 OPERATION_MODE_HEATLEVEL: Final = 0
 OPERATION_MODE_TEMPERATURE: Final = 1
@@ -205,6 +226,8 @@ ICON_SYNC: Final = "mdi:sync-circle"
 ICON_HELP: Final = "mdi:help-circle"
 ICON_PELLET: Final = "mdi:grain"
 ICON_POWER: Final = "mdi:power"
+ICON_ALERT: Final = "mdi:alert"
+ICON_ALERT_CIRCLE: Final = "mdi:alert-circle-outline"
 
 # Update intervals
 UPDATE_INTERVAL_NORMAL: Final = timedelta(seconds=20)

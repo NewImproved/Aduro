@@ -300,23 +300,27 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Track wood mode transitions
         is_in_wood_mode = current_state in ["9", "14"]
         
-        # Entering wood mode - save current settings
+        # Entering wood mode - save current settings AND trigger auto-resume if enabled
         if is_in_wood_mode and not self._was_in_wood_mode:
             _LOGGER.info("Entering wood mode (state: %s), saving pellet mode settings", current_state)
             self._pre_wood_mode_operation_mode = current_operation_mode
             self._pre_wood_mode_heatlevel = current_heatlevel
             self._pre_wood_mode_temperature = current_temperature_ref
             self._was_in_wood_mode = True
+            
+            # NEW: Trigger auto-resume immediately when entering wood mode
+            if self._auto_resume_after_wood:
+                _LOGGER.info("Auto-resume enabled, sending resume command to stove")
+                success = await self._async_resume_pellet_operation()
+                if success:
+                    data["auto_resume_commanded"] = True
+                else:
+                    _LOGGER.error("Failed to send auto-resume command")
         
-        # Exiting wood mode - auto-resume if enabled
+        # Exiting wood mode - just clear the flag
         if not is_in_wood_mode and self._was_in_wood_mode:
             _LOGGER.info("Exiting wood mode, was in state: %s", self._previous_state)
             self._was_in_wood_mode = False
-            
-            if self._auto_resume_after_wood:
-                _LOGGER.info("Auto-resume enabled, will attempt to restore pellet operation")
-                # Trigger resume on next update cycle
-                data["auto_resume_wood_mode"] = True
 
         # Initialize previous values on first run
         if self._previous_heatlevel is None:
@@ -1100,7 +1104,15 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     def set_auto_resume_after_wood(self, enabled: bool) -> None:
         """Enable or disable automatic resume after wood mode."""
+        old_value = self._auto_resume_after_wood
         self._auto_resume_after_wood = enabled
+        
+        # If disabling while in wood mode, send stop command to cancel pending resume
+        if old_value and not enabled and self._was_in_wood_mode:
+            _LOGGER.info("Auto-resume disabled during wood mode - sending stop command to cancel pending resume")
+            # Schedule the stop command
+            asyncio.create_task(self.async_stop_stove())
+        
         _LOGGER.info("Auto-resume after wood mode %s", "enabled" if enabled else "disabled")
     
     # -------------------------------------------------------------------------
@@ -1161,30 +1173,32 @@ class AduroCoordinator(DataUpdateCoordinator):
         return result
 
     async def _async_resume_pellet_operation(self) -> bool:
-        """Internal method to resume pellet operation with saved settings."""
+        """Internal method to command the stove to auto-resume pellet operation after wood mode."""
         _LOGGER.info(
-            "Resuming pellet operation - Mode: %s, Heatlevel: %s, Temperature: %s",
+            "Commanding stove to auto-resume pellet operation - Mode: %s, Heatlevel: %s, Temperature: %s",
             self._pre_wood_mode_operation_mode,
             self._pre_wood_mode_heatlevel,
             self._pre_wood_mode_temperature
         )
         
-        # Start the stove
+        # Send start command - this puts stove in waiting state during wood mode
         result = await self.async_start_stove()
         
         if not result:
-            _LOGGER.error("Failed to start stove when resuming from wood mode")
+            _LOGGER.error("Failed to send auto-resume start command")
             return False
         
-        # Wait for stove to start
-        await asyncio.sleep(5)
+        _LOGGER.info("Auto-resume start command sent successfully - stove will resume when suitable")
+        
+        # Wait a moment then restore the operation mode and settings
+        await asyncio.sleep(3)
         
         # Restore previous operation mode and settings
         if self._pre_wood_mode_operation_mode == 0 and self._pre_wood_mode_heatlevel is not None:
-            _LOGGER.info("Restoring heatlevel mode with level: %s", self._pre_wood_mode_heatlevel)
+            _LOGGER.info("Setting heatlevel mode with level: %s", self._pre_wood_mode_heatlevel)
             await self.async_set_heatlevel(self._pre_wood_mode_heatlevel)
         elif self._pre_wood_mode_operation_mode == 1 and self._pre_wood_mode_temperature is not None:
-            _LOGGER.info("Restoring temperature mode with temp: %s", self._pre_wood_mode_temperature)
+            _LOGGER.info("Setting temperature mode with temp: %s", self._pre_wood_mode_temperature)
             await self.async_set_temperature(self._pre_wood_mode_temperature)
         else:
             _LOGGER.warning("No previous settings to restore, using defaults")

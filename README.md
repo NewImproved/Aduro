@@ -23,7 +23,7 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 - Wood mode support with automatic resume
 
 🌡️ **Temperature Monitoring & Alerts**
-- High smoke temperature alert (350-500°C, configurable)
+- High smoke temperature alert (300-450°C, configurable)
 - Low wood mode temperature alert (20-200°C, configurable)
 - Customizable duration of time before alert (1-30 minutes)
 - Real-time temperature monitoring with hysteresis

@@ -118,7 +118,7 @@ STATE_NAMES: Final = {
     "4": "state_operating",
     "5": "state_operating",
     "6": "state_stopped",
-    "9": "state_off",
+    "9": "state_stopped",
     "11": "state_stopped_draft",
     "13": "state_stopped",
     "14": "state_off",
@@ -196,8 +196,8 @@ SUBSTATE_NAMES_DISPLAY: Final = {
 }
 
 # State classifications
-STARTUP_STATES: Final = ["0", "2", "4", "5", "24", "32"]
-SHUTDOWN_STATES: Final = ["6", "9", "11", "13", "14", "15", "17", "18", "19", "20", "23", "28", "33", "34", "35"]
+STARTUP_STATES: Final = ["0", "2", "4", "5", "6", "9", "24", "32"]
+SHUTDOWN_STATES: Final = ["11", "13", "14", "15", "17", "18", "19", "20", "23", "28", "33", "34", "35"]
 
 # For backward compatibility and additional detail
 STOVE_STATES_ON: Final = STARTUP_STATES

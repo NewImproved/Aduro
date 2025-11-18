@@ -711,9 +711,8 @@ class AduroMonthlyHistorySensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "monthly_history", "Monthly History")
-        self._attr_icon = "mdi:calendar-month"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        super().__init__(coordinator, entry, "monthly_history", "Consumption Monthly History")
+        self._attr_icon = "mdi:grain"
 
     @property
     def available(self) -> bool:
@@ -759,9 +758,8 @@ class AduroYearlyHistorySensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "yearly_history", "Yearly History")
-        self._attr_icon = "mdi:calendar"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        super().__init__(coordinator, entry, "yearly_history", "Consumption Yearly History")
+        self._attr_icon = "mdi:grain"
 
     @property
     def available(self) -> bool:

@@ -73,6 +73,8 @@ async def async_setup_entry(
         AduroConsumptionYesterdaySensor(coordinator, entry),
         AduroConsumptionMonthSensor(coordinator, entry),
         AduroConsumptionYearSensor(coordinator, entry),
+        AduroMonthlyHistorySensor(coordinator, entry),
+        AduroYearlyHistorySensor(coordinator, entry),
         
         # Network sensors
         AduroStoveIPSensor(coordinator, entry),
@@ -703,6 +705,99 @@ class AduroConsumptionYearSensor(AduroSensorBase):
             current_value = self.coordinator.data["consumption"].get("year")
         return self._get_cached_value(current_value)
 
+
+class AduroMonthlyHistorySensor(AduroSensorBase):
+    """Sensor showing monthly consumption history."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "monthly_history", "Monthly History")
+        self._attr_icon = "mdi:calendar-month"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if not super().available:
+            return False
+        # Check if we have consumption data
+        if not self.coordinator.data:
+            return False
+        if "consumption" not in self.coordinator.data:
+            return False
+        return True
+
+    @property
+    def native_value(self) -> str | None:
+        """Return current month's consumption."""
+        if not self.coordinator.data or "consumption" not in self.coordinator.data:
+            return None
+        consumption = self.coordinator.data["consumption"]
+        month_value = consumption.get("month", 0)
+        return str(round(month_value, 2)) if month_value else "0"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return all monthly data as attributes."""
+        if not self.coordinator.data or "consumption" not in self.coordinator.data:
+            return {}
+        
+        consumption = self.coordinator.data["consumption"]
+        history = consumption.get("monthly_history", {})
+        
+        if not history:
+            return {}
+        
+        attrs = dict(history)
+        # Add year total
+        attrs["year_total"] = round(sum(history.values()), 2)
+        return attrs
+
+
+class AduroYearlyHistorySensor(AduroSensorBase):
+    """Sensor showing yearly consumption history."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "yearly_history", "Yearly History")
+        self._attr_icon = "mdi:calendar"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if not super().available:
+            return False
+        # Check if we have consumption data
+        if not self.coordinator.data:
+            return False
+        if "consumption" not in self.coordinator.data:
+            return False
+        return True
+
+    @property
+    def native_value(self) -> str | None:
+        """Return current year's consumption."""
+        if not self.coordinator.data or "consumption" not in self.coordinator.data:
+            return None
+        consumption = self.coordinator.data["consumption"]
+        year_value = consumption.get("year", 0)
+        return str(round(year_value, 2)) if year_value else "0"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return all yearly data as attributes."""
+        if not self.coordinator.data or "consumption" not in self.coordinator.data:
+            return {}
+        
+        consumption = self.coordinator.data["consumption"]
+        history = consumption.get("yearly_history", {})
+        
+        if not history:
+            return {}
+        
+        return history
+        
 
 # =============================================================================
 # Network Sensors

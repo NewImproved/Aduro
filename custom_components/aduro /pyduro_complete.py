@@ -333,7 +333,7 @@ def get_consumption_data(ip, serial, pin):
 
     year = date.today().year
     # Calculate data array position from current year. 2013 is data[0]...
-    data_position_offset = year - (year - (len(data) - 1))
+    data_position_offset = len(data) - 1
 
     if response:
         consumption_json = {

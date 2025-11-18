@@ -90,6 +90,9 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._shutdown_notification_sent = False
         self._low_pellet_notification_sent = False
 
+        # Historical consumption tracking (in __init__)
+        self._consumption_snapshots = {}  # Stores monthly snapshots by year-month
+
         # Daily consumption tracking
         self._consumption_at_refill = 0.0  # Last seen daily consumption value (baseline)
         self._days_since_refill = 0
@@ -1044,11 +1047,14 @@ class AduroCoordinator(DataUpdateCoordinator):
             data = response.parse_payload().split(',')
             data[0] = data[0][13:]  # Remove "total_months" prefix
             
-            month = date.today().month
+            current_month = date.today().month
             current_year = date.today().year
-            consumption_data["month"] = float(data[month - 1]) if len(data) >= month else 0
             
-            # Store all monthly data with historical tracking
+            # Current month consumption
+            consumption_data["month"] = float(data[current_month - 1]) if len(data) >= current_month else 0
+            
+            # Store all monthly data - this is a calendar year array (Jan=0, Dec=11)
+            # Note: December (position 11) contains last year's December until this year's December is recorded
             monthly_history = {}
             month_names = [
                 "january", "february", "march", "april", "may", "june",
@@ -1058,6 +1064,48 @@ class AduroCoordinator(DataUpdateCoordinator):
             for i, month_name in enumerate(month_names):
                 if i < len(data):
                     monthly_history[month_name] = float(data[i])
+            
+            consumption_data["monthly_history"] = monthly_history
+            
+            # Save snapshot of current month for historical comparison
+            # This preserves the exact consumption values at the end of each month
+            current_month_name = month_names[current_month - 1]
+            snapshot_key = f"{current_year}_{current_month_name}"
+            current_month_value = float(data[current_month - 1]) if current_month - 1 < len(data) else 0
+            
+            # Only update snapshot if we have a real value (not just initialization value of 0.002)
+            if current_month_value > 0.002:
+                self._consumption_snapshots[snapshot_key] = current_month_value
+            
+            # Store snapshots in consumption data for sensor access
+            consumption_data["monthly_snapshots"] = dict(self._consumption_snapshots)
+            
+            # Calculate year-over-year comparison if we have data from previous year
+            last_year = current_year - 1
+            last_year_same_month_key = f"{last_year}_{current_month_name}"
+            
+            if last_year_same_month_key in self._consumption_snapshots:
+                last_year_value = self._consumption_snapshots[last_year_same_month_key]
+                current_year_value = current_month_value
+                
+                if last_year_value > 0:
+                    difference = current_year_value - last_year_value
+                    percentage_change = (difference / last_year_value) * 100
+                    
+                    consumption_data["year_over_year"] = {
+                        "current_month": current_month_name,
+                        "current_year_value": round(current_year_value, 2),
+                        "last_year_value": round(last_year_value, 2),
+                        "difference": round(difference, 2),
+                        "percentage_change": round(percentage_change, 1),
+                    }
+                    
+                    _LOGGER.debug(
+                        f"Year-over-year comparison for {current_month_name}: "
+                        f"{current_year_value:.2f} kg ({current_year}) vs "
+                        f"{last_year_value:.2f} kg ({last_year}) = "
+                        f"{difference:+.2f} kg ({percentage_change:+.1f}%)"
+                    )
             
             consumption_data["monthly_history"] = monthly_history
             

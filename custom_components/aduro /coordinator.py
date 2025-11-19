@@ -304,7 +304,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             )
 
             # Track wood mode transitions
-            is_in_wood_mode = current_state in ["9", "14"]
+            is_in_wood_mode = current_state in ["9"]
             
             # Entering wood mode - save current settings AND trigger auto-resume if enabled
             if is_in_wood_mode and not self._was_in_wood_mode:
@@ -1628,7 +1628,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         smoke_temp = data["operating"].get("smoke_temp", 0)
         current_state = data["operating"].get("state")
-        is_in_wood_mode = current_state in ["9", "14"]
+        is_in_wood_mode = current_state in ["9"]
         shaft_temp = data["operating"].get("shaft_temp", 0)
         
         # Initialize alerts dict if not present

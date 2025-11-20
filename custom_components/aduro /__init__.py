@@ -6,7 +6,6 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.storage import Store
 
 from .const import (
     DOMAIN,
@@ -37,7 +36,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create coordinator
     coordinator = AduroCoordinator(hass, entry)
 
-    # Load persisted pellet data BEFORE loading options:
+    # Load persisted pellet data before options
     await coordinator.async_load_pellet_data()
     
     # Load saved options and apply to coordinator
@@ -107,7 +106,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     await coordinator.async_save_pellet_data()
-
+    
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
 

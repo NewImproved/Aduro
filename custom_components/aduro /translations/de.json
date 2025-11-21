@@ -243,6 +243,18 @@
       },
       "shutdown_level": {
         "name": "Abschaltpelletstand"
+      },
+      "high_smoke_temp_threshold": {
+        "name": "Hohe Rauchtemperatur-Schwelle (°C)"
+      },
+      "high_smoke_duration_threshold": {
+        "name": "Dauer für hohe Rauchwarnung (Sekunden)"
+      },
+      "low_wood_temp_threshold": {
+        "name": "Niedrige Holzmodus-Temperatur-Schwelle (°C)"
+      },
+      "low_wood_duration_threshold": {
+        "name": "Dauer für niedrige Holzmodus-Warnung (Sekunden)"
       }
     },
     "button": {

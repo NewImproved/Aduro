@@ -44,14 +44,14 @@ class AduroButtonBase(CoordinatorEntity, ButtonEntity):
         coordinator: AduroCoordinator,
         entry: ConfigEntry,
         button_type: str,
-        name: str,
+        translation_key: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entry = entry
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{entry.entry_id}_{button_type}"
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._button_type = button_type
 
     def combined_firmware_version(self) -> str | None:
@@ -120,7 +120,7 @@ class AduroRefillPelletsButton(AduroButtonBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the button."""
-        super().__init__(coordinator, entry, "refill_pellets", "Refill Pellets")
+        super().__init__(coordinator, entry, "refill_pellets", "refill_pellets")
         self._attr_icon = "mdi:reload"
 
     @property
@@ -164,7 +164,7 @@ class AduroCleanStoveButton(AduroButtonBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the button."""
-        super().__init__(coordinator, entry, "clean_stove", "Clean Stove")
+        super().__init__(coordinator, entry, "clean_stove", "clean_stove")
         self._attr_icon = "mdi:broom"
 
     @property
@@ -203,7 +203,7 @@ class AduroToggleModeButton(AduroButtonBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the button."""
-        super().__init__(coordinator, entry, "toggle_mode", "Toggle Mode")
+        super().__init__(coordinator, entry, "toggle_mode", "toggle_mode")
 
     @property
     def icon(self) -> str:
@@ -276,7 +276,7 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the button."""
-        super().__init__(coordinator, entry, "resume_after_wood", "Resume After Wood Mode")
+        super().__init__(coordinator, entry, "resume_after_wood", "resume_after_wood")
         self._attr_icon = "mdi:play-circle"
 
     @property
@@ -342,7 +342,7 @@ class AduroForceAugerButton(AduroButtonBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the button."""
-        super().__init__(coordinator, entry, "force_auger", "Force Auger")
+        super().__init__(coordinator, entry, "force_auger", "force_auger")
         self._attr_icon = "mdi:cog-play"
         self._attr_entity_category = EntityCategory.CONFIG
 

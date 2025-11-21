@@ -69,14 +69,14 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
         coordinator: AduroCoordinator,
         entry: ConfigEntry,
         number_type: str,
-        name: str,
+        translation_key: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entry = entry
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{entry.entry_id}_{number_type}"
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._number_type = number_type
         
         # Debouncing support
@@ -132,7 +132,7 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
         # Cancel any existing debounce task
         if self._debounce_task and not self._debounce_task.done():
             self._debounce_task.cancel()
-            _LOGGER.debug("%s: Cancelled previous debounce task", self._attr_name)
+            _LOGGER.debug("%s: Cancelled previous debounce task", self._attr_translation_key)
         
         # Store the pending value
         self._pending_value = value
@@ -146,13 +146,13 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
                 await asyncio.sleep(delay)
                 _LOGGER.info(
                     "%s: Debounce complete, sending value: %s",
-                    self._attr_name,
+                    self._attr_translation_key,
                     self._pending_value
                 )
                 await self._actually_set_value(self._pending_value)
                 self._pending_value = None
             except asyncio.CancelledError:
-                _LOGGER.debug("%s: Debounce task cancelled", self._attr_name)
+                _LOGGER.debug("%s: Debounce task cancelled", self._attr_translation_key)
                 raise
         
         self._debounce_task = asyncio.create_task(_send_after_delay())
@@ -167,7 +167,7 @@ class AduroHeatlevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "heatlevel", "Heat Level")
+        super().__init__(coordinator, entry, "heatlevel", "heatlevel")
         self._attr_icon = "mdi:fire"
         self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = HEAT_LEVEL_MIN
@@ -237,7 +237,7 @@ class AduroTemperatureNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "temperature", "Target Temperature")
+        super().__init__(coordinator, entry, "temperature", "temperature")
         self._attr_icon = "mdi:thermometer"
         self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = TEMP_MIN
@@ -305,7 +305,7 @@ class AduroPelletCapacityNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "pellet_capacity", "Pellet Capacity")
+        super().__init__(coordinator, entry, "pellet_capacity", "pellet_capacity")
         self._attr_icon = "mdi:grain"
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = PELLET_CAPACITY_MIN
@@ -352,7 +352,7 @@ class AduroNotificationLevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "notification_level", "Low Pellet Notification Level")
+        super().__init__(coordinator, entry, "notification_level", "notification_level")
         self._attr_icon = "mdi:bell-alert"
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = NOTIFICATION_LEVEL_MIN
@@ -401,7 +401,7 @@ class AduroShutdownLevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "shutdown_level", "Auto-Shutdown Pellet Level")
+        super().__init__(coordinator, entry, "shutdown_level", "shutdown_level")
         self._attr_icon = "mdi:power-off"
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = SHUTDOWN_LEVEL_MIN
@@ -450,7 +450,7 @@ class AduroHighSmokeTempThresholdNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "high_smoke_temp_threshold", "High Smoke Temp Alert Threshold")
+        super().__init__(coordinator, entry, "high_smoke_temp_threshold", "high_smoke_temp_threshold")
         self._attr_icon = "mdi:thermometer-alert"
         self._attr_mode = NumberMode.BOX
         from .const import HIGH_SMOKE_TEMP_MIN, HIGH_SMOKE_TEMP_MAX, HIGH_SMOKE_TEMP_STEP
@@ -499,7 +499,7 @@ class AduroHighSmokeDurationThresholdNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "high_smoke_duration_threshold", "High Smoke Temp Alert Duration")
+        super().__init__(coordinator, entry, "high_smoke_duration_threshold", "high_smoke_duration_threshold")
         self._attr_icon = "mdi:timer-alert-outline"
         self._attr_mode = NumberMode.BOX
         from .const import HIGH_SMOKE_DURATION_MIN, HIGH_SMOKE_DURATION_MAX, HIGH_SMOKE_DURATION_STEP
@@ -551,7 +551,7 @@ class AduroLowWoodTempThresholdNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "low_wood_temp_threshold", "Low Wood Temp Alert Threshold")
+        super().__init__(coordinator, entry, "low_wood_temp_threshold", "low_wood_temp_threshold")
         self._attr_icon = "mdi:thermometer-low"
         self._attr_mode = NumberMode.BOX
         from .const import LOW_WOOD_TEMP_MIN, LOW_WOOD_TEMP_MAX, LOW_WOOD_TEMP_STEP
@@ -604,7 +604,7 @@ class AduroLowWoodDurationThresholdNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "low_wood_duration_threshold", "Low Wood Temp Alert Duration")
+        super().__init__(coordinator, entry, "low_wood_duration_threshold", "low_wood_duration_threshold")
         self._attr_icon = "mdi:timer-outline"
         self._attr_mode = NumberMode.BOX
         from .const import LOW_WOOD_DURATION_MIN, LOW_WOOD_DURATION_MAX, LOW_WOOD_DURATION_STEP

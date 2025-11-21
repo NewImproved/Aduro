@@ -112,14 +112,14 @@ class AduroSensorBase(CoordinatorEntity, SensorEntity):
         coordinator: AduroCoordinator,
         entry: ConfigEntry,
         sensor_type: str,
-        name: str,
+        translation_key: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entry = entry
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{entry.entry_id}_{sensor_type}"
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._sensor_type = sensor_type
         self._last_valid_value = None
 
@@ -193,15 +193,32 @@ class AduroStateSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "state", "State")
+        super().__init__(coordinator, entry, "state", "state")
         self._attr_icon = "mdi:state-machine"
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_device_class = SensorDeviceClass.ENUM
+        self._attr_options = [
+            "state_operating",
+            "state_stopped",
+            "state_off",
+            "state_operating_iii",
+            "state_stopped_draft",
+            "state_stopped_smoke_sensor",
+            "state_stopped_dropshaft",
+            "state_stopped_burner_yellow",
+            "state_stopped_auger",
+            "state_stopped_timer",
+            "state_operating_air_damper",
+            "state_stopped_co_sensor",
+            "state_stopped_no_fan",
+        ]
 
     @property
     def native_value(self) -> str | None:
-        """Return the state."""
+        """Return the state translation key."""
         if self.coordinator.data and "operating" in self.coordinator.data:
-            return self.coordinator.data["operating"].get("state")
+            state = self.coordinator.data["operating"].get("state")
+            # Return translation key
+            return STATE_NAMES.get(state, "state_unknown")
         return None
 
 
@@ -210,15 +227,39 @@ class AduroSubstateSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "substate", "Substate")
+        super().__init__(coordinator, entry, "substate", "substate")
         self._attr_icon = "mdi:state-machine"
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_device_class = SensorDeviceClass.ENUM
+        self._attr_options = [
+            "substate_waiting",
+            "substate_ignition_1",
+            "substate_ignition_2",
+            "substate_normal",
+            "substate_temp_reached",
+            "substate_wood_burning",
+            "substate_dropshaft_hot",
+            "substate_failed_ignition",
+            "substate_by_button",
+            "substate_wood_burning_question",
+            "substate_no_fuel",
+            "substate_unknown",
+            "substate_heating_up",
+            "substate_check_burn_cup",
+        ]
 
     @property
     def native_value(self) -> str | None:
-        """Return the substate."""
+        """Return the substate translation key."""
         if self.coordinator.data and "operating" in self.coordinator.data:
-            return self.coordinator.data["operating"].get("substate")
+            state = self.coordinator.data["operating"].get("state", "")
+            substate = self.coordinator.data["operating"].get("substate", "")
+            
+            # Check for combined state_substate first
+            combined_key = f"{state}_{substate}"
+            if combined_key in SUBSTATE_NAMES:
+                return SUBSTATE_NAMES[combined_key]
+            # Fall back to state only
+            return SUBSTATE_NAMES.get(state, "substate_unknown")
         return None
 
 
@@ -227,7 +268,7 @@ class AduroMainStatusSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "status_main", "Status Main")
+        super().__init__(coordinator, entry, "status_main", "status_main")
         self._attr_icon = "mdi:information"
 
     @property
@@ -249,11 +290,9 @@ class AduroMainStatusSensor(AduroSensorBase):
                 state
             )
         
-        # If we have a translation key, try to get translated text
-        # Otherwise fall back to display version
+        # For now, use display version as Home Assistant doesn't support 
+        # format strings in state translations yet
         if state_key:
-            # For now, use display version
-            # TODO: Implement proper translation lookup when HA adds support
             from .const import STATE_NAMES_DISPLAY
             status_template = STATE_NAMES_DISPLAY.get(state, f"Unknown State {state}")
         else:
@@ -287,7 +326,7 @@ class AduroSubStatusSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "status_sub", "Status Sub")
+        super().__init__(coordinator, entry, "status_sub", "status_sub")
         self._attr_icon = "mdi:information-outline"
         self._timer_update_task = None
 
@@ -397,7 +436,7 @@ class AduroBoilerTempSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "boiler_temp", "Boiler Temperature")
+        super().__init__(coordinator, entry, "boiler_temp", "boiler_temp")
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -415,7 +454,7 @@ class AduroBoilerRefSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "boiler_ref", "Boiler Reference")
+        super().__init__(coordinator, entry, "boiler_ref", "boiler_ref")
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -433,7 +472,7 @@ class AduroSmokeTempSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "smoke_temp", "Smoke Temperature")
+        super().__init__(coordinator, entry, "smoke_temp", "smoke_temp")
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -451,7 +490,7 @@ class AduroShaftTempSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "shaft_temp", "Shaft Temperature")
+        super().__init__(coordinator, entry, "shaft_temp", "shaft_temp")
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -473,7 +512,7 @@ class AduroPowerKwSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "power_kw", "Power")
+        super().__init__(coordinator, entry, "power_kw", "power_kw")
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -495,7 +534,7 @@ class AduroOperationModeSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "operation_mode", "Operation Mode")
+        super().__init__(coordinator, entry, "operation_mode", "operation_mode")
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
@@ -536,7 +575,7 @@ class AduroPelletAmountSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "pellet_amount", "Pellet Amount")
+        super().__init__(coordinator, entry, "pellet_amount", "pellet_amount")
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -555,7 +594,7 @@ class AduroPelletPercentageSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "pellet_percentage", "Pellet Percentage")
+        super().__init__(coordinator, entry, "pellet_percentage", "pellet_percentage")
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_icon = "mdi:percent"
@@ -573,7 +612,7 @@ class AduroPelletConsumedSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "pellet_consumed", "Pellet Consumed")
+        super().__init__(coordinator, entry, "pellet_consumed", "pellet_consumed")
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -592,7 +631,7 @@ class AduroPelletConsumptionTotalSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "consumption_total", "Consumption Total")
+        super().__init__(coordinator, entry, "consumption_total", "consumption_total")
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -611,7 +650,7 @@ class AduroPelletRefillCounterSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "refill_counter", "Refill Counter")
+        super().__init__(coordinator, entry, "refill_counter", "refill_counter")
         self._attr_state_class = SensorStateClass.TOTAL
         self._attr_icon = "mdi:counter"
 
@@ -632,7 +671,7 @@ class AduroConsumptionDaySensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "consumption_day", "Consumption Today")
+        super().__init__(coordinator, entry, "consumption_day", "consumption_day")
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -652,7 +691,7 @@ class AduroConsumptionYesterdaySensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "consumption_yesterday", "Consumption Yesterday")
+        super().__init__(coordinator, entry, "consumption_yesterday", "consumption_yesterday")
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL
@@ -672,7 +711,7 @@ class AduroConsumptionMonthSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "consumption_month", "Consumption This Month")
+        super().__init__(coordinator, entry, "consumption_month", "consumption_month")
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -692,7 +731,7 @@ class AduroConsumptionYearSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "consumption_year", "Consumption This Year")
+        super().__init__(coordinator, entry, "consumption_year", "consumption_year")
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -712,7 +751,7 @@ class AduroMonthlyHistorySensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "monthly_history", "Consumption Monthly History")
+        super().__init__(coordinator, entry, "monthly_history", "monthly_history")
         self._attr_icon = "mdi:grain"
 
     @property
@@ -764,7 +803,7 @@ class AduroYearlyHistorySensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "yearly_history", "Consumption Yearly History")
+        super().__init__(coordinator, entry, "yearly_history", "yearly_history")
         self._attr_icon = "mdi:grain"
 
     @property
@@ -808,7 +847,7 @@ class AduroYearOverYearSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "year_over_year", "Consumption Year Over Year")
+        super().__init__(coordinator, entry, "year_over_year", "year_over_year")
         self._attr_icon = "mdi:grain"
   
     @property
@@ -881,7 +920,7 @@ class AduroStoveIPSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "stove_ip", "Stove IP")
+        super().__init__(coordinator, entry, "stove_ip", "stove_ip")
         self._attr_icon = "mdi:ip-network"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -896,7 +935,7 @@ class AduroRouterSSIDSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "router_ssid", "Router SSID")
+        super().__init__(coordinator, entry, "router_ssid", "router_ssid")
         self._attr_icon = "mdi:wifi"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -914,7 +953,7 @@ class AduroStoveRSSISensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "stove_rssi", "WiFi Signal")
+        super().__init__(coordinator, entry, "stove_rssi", "stove_rssi")
         self._attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
         self._attr_native_unit_of_measurement = "dBm"
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -939,7 +978,7 @@ class AduroStoveMacSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "stove_mac", "Stove MAC")
+        super().__init__(coordinator, entry, "stove_mac", "stove_mac")
         self._attr_icon = "mdi:network"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -956,7 +995,7 @@ class AduroFirmwareVersionSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "firmware_version", "Firmware Version")
+        super().__init__(coordinator, entry, "firmware_version", "firmware_version")
         self._attr_icon = "mdi:chip"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -989,7 +1028,7 @@ class AduroOperatingTimeStoveSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "operating_time_stove", "Operating Time Stove")
+        super().__init__(coordinator, entry, "operating_time_stove", "operating_time_stove")
         self._attr_icon = "mdi:clock"
 
     @property
@@ -1022,7 +1061,7 @@ class AduroOperatingTimeAugerSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "operating_time_auger", "Operating Time Auger")
+        super().__init__(coordinator, entry, "operating_time_auger", "operating_time_auger")
         self._attr_icon = "mdi:clock"
 
     @property
@@ -1055,7 +1094,7 @@ class AduroOperatingTimeIgnitionSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "operating_time_ignition", "Operating Time Ignition")
+        super().__init__(coordinator, entry, "operating_time_ignition", "operating_time_ignition")
         self._attr_icon = "mdi:clock"
 
     @property
@@ -1093,7 +1132,7 @@ class AduroModeTransitionSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "mode_transition", "Mode Transition")
+        super().__init__(coordinator, entry, "mode_transition", "mode_transition")
         self._attr_icon = "mdi:state-machine"
 
     @property
@@ -1109,7 +1148,7 @@ class AduroChangeInProgressSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "change_in_progress", "Change In Progress")
+        super().__init__(coordinator, entry, "change_in_progress", "change_in_progress")
         self._attr_icon = "mdi:sync"
 
     @property
@@ -1126,7 +1165,7 @@ class AduroDisplayFormatSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "display_format", "Display Format")
+        super().__init__(coordinator, entry, "display_format", "display_format")
         self._attr_icon = "mdi:format-text"
 
     @property
@@ -1142,7 +1181,7 @@ class AduroDisplayTargetSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "display_target", "Display Target")
+        super().__init__(coordinator, entry, "display_target", "display_target")
 
     @property
     def native_value(self) -> int | float | None:
@@ -1188,7 +1227,7 @@ class AduroAppChangeDetectedSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "app_change_detected", "App Change Detected")
+        super().__init__(coordinator, entry, "app_change_detected", "app_change_detected")
         self._attr_icon = "mdi:cellphone-arrow-down"
 
     @property
@@ -1208,7 +1247,7 @@ class AduroHighSmokeTempAlertSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "high_smoke_temp_alert", "High Smoke Temperature Alert")
+        super().__init__(coordinator, entry, "high_smoke_temp_alert", "high_smoke_temp_alert")
         self._attr_icon = "mdi:alert-circle"
 
     @property
@@ -1269,7 +1308,7 @@ class AduroLowWoodTempAlertSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "low_wood_temp_alert", "Low Wood Temperature Alert")
+        super().__init__(coordinator, entry, "low_wood_temp_alert", "low_wood_temp_alert")
         self._attr_icon = "mdi:alert-circle"
 
     @property

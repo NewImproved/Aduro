@@ -234,6 +234,18 @@
       },
       "shutdown_level": {
         "name": "Automatisk Avstängnings Pelletsnivå"
+      },
+      "high_smoke_temp_threshold": {
+        "name": "Tröskelvärde för Hög Röktemperatur (°C)"
+      },
+      "high_smoke_duration_threshold": {
+        "name": "Varaktighet för Hög Rökvarning (sekunder)"
+      },
+      "low_wood_temp_threshold": {
+        "name": "Tröskelvärde för Låg Vedlägestemperatur (°C)"
+      },
+      "low_wood_duration_threshold": {
+        "name": "Varaktighet för Låg Vedlägesvarning (sekunder)"
       }
     },
     "button": {

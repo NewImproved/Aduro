@@ -2,19 +2,341 @@
   "config": {
     "step": {
       "user": {
+        "title": "Set up Aduro Hybrid Stove",
+        "description": "Enter your stove connection details",
         "data": {
-          "stove_model": "[%key:component::aduro::config::step::user::data::stove_model%]",
-          "stove_serial": "[%key:component::aduro::config::step::user::data::stove_serial%]",
-          "stove_pin": "[%key:component::aduro::config::step::user::data::stove_pin%]"
+          "stove_serial": "Stove Serial Number",
+          "stove_pin": "Stove PIN",
+          "stove_model": "Stove Model"
         }
       }
+    },
+    "error": {
+      "missing_serial": "Serial number is required",
+      "missing_pin": "PIN is required",
+      "cannot_connect": "Failed to connect",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This stove is already configured"
     }
   },
   "options": {
     "step": {
       "init": {
+        "title": "Configure Aduro Stove",
+        "description": "Choose a configuration area",
+        "menu_options": {
+          "pellet_settings": "Pellet Settings",
+          "temperature_alerts": "Temperature Alerts",
+          "advanced_settings": "Advanced Settings"
+        }
+      },
+      "pellet_settings": {
+        "title": "Pellet Configuration",
+        "description": "Configure pellet container and low pellet alerts",
         "data": {
-          "stove_model": "[%key:component::aduro::config::step::user::data::stove_model%]"
+          "pellet_capacity": "Pellet Container Capacity (kg)",
+          "notification_level": "Low Pellet Notification Level (%)",
+          "shutdown_level": "Auto-Shutdown Level (%)",
+          "auto_shutdown_enabled": "Enable Auto-Shutdown"
+        },
+        "data_description": {
+          "pellet_capacity": "Total capacity of your pellet container in kilograms",
+          "notification_level": "Receive a notification when pellets drop below this percentage",
+          "shutdown_level": "Automatically shutdown stove when pellets drop below this percentage",
+          "auto_shutdown_enabled": "Allow the stove to automatically shutdown at low pellet level"
+        }
+      },
+      "temperature_alerts": {
+        "title": "Temperature Alert Configuration",
+        "description": "Configure temperature monitoring and alerts",
+        "data": {
+          "high_smoke_temp_threshold": "High Smoke Temperature Threshold (°C)",
+          "high_smoke_duration_threshold": "High Smoke Alert Duration (seconds)",
+          "low_wood_temp_threshold": "Low Wood Mode Temperature Threshold (°C)",
+          "low_wood_duration_threshold": "Low Wood Mode Alert Duration (seconds)"
+        },
+        "data_description": {
+          "high_smoke_temp_threshold": "Trigger alert when smoke temperature exceeds this value",
+          "high_smoke_duration_threshold": "Time in seconds temperature must exceed threshold before alerting",
+          "low_wood_temp_threshold": "Trigger alert when wood mode temperature drops below this value",
+          "low_wood_duration_threshold": "Time in seconds temperature must be low before alerting"
+        }
+      },
+      "advanced_settings": {
+        "title": "Advanced Settings",
+        "description": "Configure advanced stove behaviors",
+        "data": {
+          "auto_resume_after_wood": "Auto-Resume After Wood Mode"
+        },
+        "data_description": {
+          "auto_resume_after_wood": "Automatically resume pellet operation with previous settings when exiting wood mode"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "state": {
+        "name": "State",
+        "state": {
+          "state_operating": "Power {heatlevel}",
+          "state_stopped": "Stopped",
+          "state_off": "Off",
+          "state_operating_iii": "Power III",
+          "state_stopped_draft": "Dropshaft hot",
+          "state_stopped_smoke_sensor": "Bad smoke sensor",
+          "state_stopped_dropshaft": "Bad dropshaft sensor",
+          "state_stopped_burner_yellow": "Check burner yellow",
+          "state_stopped_auger": "bad external auger output",
+          "state_stopped_timer": "Stopped by timer",
+          "state_operating_air_damper": "Air damper closed",
+          "state_stopped_co_sensor": "Co sensor defect",
+          "state_stopped_no_fan": "No power consumption for fan"
+        }
+      },
+      "substate": {
+        "name": "Substate",
+        "state": {
+          "substate_waiting": "Wait",
+          "substate_ignition_1": "Ignition 1",
+          "substate_ignition_2": "Ignition 2",
+          "substate_normal": "Normal",
+          "substate_temp_reached": "Room temperature reached",
+          "substate_wood_burning": "Wood burning",
+          "substate_failed_ignition": "Failed ignition - Open door and check burner for pellet accumulation",
+          "substate_by_button": "By button",
+          "substate_wood_burning_question": "Wood burning?",
+          "substate_no_fuel": "No fuel",
+          "substate_unknown": "Unknown",
+          "substate_heating_up": "Heating up",
+          "substate_check_burn_cup": "Check burn cup"
+        }
+      },
+      "status_main": {
+        "name": "Status"
+      },
+      "status_sub": {
+        "name": "Status Detail"
+      },
+      "boiler_temp": {
+        "name": "Room Temperature"
+      },
+      "boiler_ref": {
+        "name": "Target Temperature"
+      },
+      "smoke_temp": {
+        "name": "Smoke Temperature"
+      },
+      "shaft_temp": {
+        "name": "Shaft Temperature"
+      },
+      "power_kw": {
+        "name": "Power Output"
+      },
+      "power_pct": {
+        "name": "Power Percentage"
+      },
+      "heatlevel": {
+        "name": "Heat Level"
+      },
+      "heatlevel_display": {
+        "name": "Heat Level Display"
+      },
+      "operation_mode": {
+        "name": "Operation Mode"
+      },
+      "pellet_amount": {
+        "name": "Pellets Remaining"
+      },
+      "pellet_percentage": {
+        "name": "Pellets Percentage"
+      },
+      "pellet_consumed": {
+        "name": "Pellets Consumed"
+      },
+      "consumption_total": {
+        "name": "Total Consumption"
+      },
+      "refill_counter": {
+        "name": "Refill Counter"
+      },
+      "consumption_day": {
+        "name": "Today's Consumption"
+      },
+      "consumption_yesterday": {
+        "name": "Yesterday's Consumption"
+      },
+      "consumption_month": {
+        "name": "This Month's Consumption"
+      },
+      "consumption_year": {
+        "name": "This Year's Consumption"
+      },
+      "stove_ip": {
+        "name": "Stove IP Address"
+      },
+      "router_ssid": {
+        "name": "WiFi Network"
+      },
+      "stove_rssi": {
+        "name": "WiFi Signal Strength"
+      },
+      "stove_mac": {
+        "name": "MAC Address"
+      },
+      "timer_startup_1": {
+        "name": "Ignition Timer 1"
+      },
+      "timer_startup_2": {
+        "name": "Ignition Timer 2"
+      },
+      "operating_time_stove": {
+        "name": "Total Operating Time"
+      },
+      "operating_time_auger": {
+        "name": "Auger Operating Time"
+      },
+      "operating_time_ignition": {
+        "name": "Ignition Operating Time"
+      },
+      "mode_transition": {
+        "name": "Mode Transition"
+      },
+      "change_in_progress": {
+        "name": "Change In Progress"
+      },
+      "display_format": {
+        "name": "Display Format"
+      },
+      "display_target": {
+        "name": "Display Target"
+      },
+      "app_change_detected": {
+        "name": "External Change Detected"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      },
+      "auto_shutdown": {
+        "name": "Auto Shutdown at Low Pellets"
+      },
+      "auto_resume_wood": {
+        "name": "Auto Resume After Wood Mode"
+      }
+    },
+    "number": {
+      "heatlevel": {
+        "name": "Heat Level"
+      },
+      "temperature": {
+        "name": "Target Temperature"
+      },
+      "pellet_capacity": {
+        "name": "Pellet Capacity"
+      },
+      "notification_level": {
+        "name": "Low Pellet Notification Level"
+      },
+      "shutdown_level": {
+        "name": "Auto-Shutdown Pellet Level"
+      },
+      "high_smoke_temp_threshold": {
+        "name": "High smoke temp threshold"
+      },
+      "high_smoke_duration_threshold": {
+        "name": "High smoke duration threshold"
+      },
+      "low_wood_temp_threshold": {
+        "name": "Low wood temp threshold"
+      },
+      "low_wood_duration_threshold": {
+        "name": "Low wood duration threshold"
+      }
+    },
+    "button": {
+      "refill_pellets": {
+        "name": "Refill Pellets"
+      },
+      "clean_stove": {
+        "name": "Clean Stove"
+      },
+      "toggle_mode": {
+        "name": "Toggle Mode"
+      },
+      "resume_after_wood": {
+        "name": "Resume After Wood Mode"
+      },
+      "force_auger": {
+        "name": "Force Auger"
+      }
+    }
+  },
+  "services": {
+    "start_stove": {
+      "name": "Start Stove",
+      "description": "Start the pellet stove operation."
+    },
+    "stop_stove": {
+      "name": "Stop Stove",
+      "description": "Stop the pellet stove operation."
+    },
+    "set_heatlevel": {
+      "name": "Set Heat Level",
+      "description": "Set the stove heat level (1-3). Also switches to heatlevel operation mode.",
+      "fields": {
+        "heatlevel": {
+          "name": "Heat Level",
+          "description": "Heat level to set (1=Low, 2=Medium, 3=High)."
+        }
+      }
+    },
+    "set_temperature": {
+      "name": "Set Temperature",
+      "description": "Set the target room temperature. Also switches to temperature operation mode.",
+      "fields": {
+        "temperature": {
+          "name": "Temperature",
+          "description": "Target temperature in degrees Celsius."
+        }
+      }
+    },
+    "set_operation_mode": {
+      "name": "Set Operation Mode",
+      "description": "Set the stove operation mode.",
+      "fields": {
+        "mode": {
+          "name": "Operation Mode",
+          "description": "Operation mode: 0=Heat Level, 1=Temperature, 2=Wood"
+        }
+      }
+    },
+    "toggle_mode": {
+      "name": "Toggle Mode",
+      "description": "Toggle between heat level and temperature operation modes."
+    },
+    "resume_after_wood_mode": {
+      "name": "Resume After Wood Mode",
+      "description": "Resume pellet operation after wood mode, restoring previous settings."
+    },
+    "force_auger": {
+      "name": "Force Auger",
+      "description": "Force the pellet auger to run (for testing or clearing jams)."
+    },
+    "set_custom": {
+      "name": "Set Custom Parameter",
+      "description": "Set a custom stove parameter by path and value (advanced).",
+      "fields": {
+        "path": {
+          "name": "Parameter Path",
+          "description": "The parameter path (e.g., 'auger.forced_run')."
+        },
+        "value": {
+          "name": "Value",
+          "description": "The value to set (can be string, number, or boolean)."
         }
       }
     }

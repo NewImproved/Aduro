@@ -165,6 +165,15 @@
       "consumption_year": {
         "name": "Årets Förbrukning"
       },
+      "year_over_year": {
+        "name": "År mot år"
+      },
+      "monthly_history": {
+        "name": "Förbrukningshistorik månad"
+      },
+      "yearly_history": {
+        "name": "Förbrukningshistorik år"
+      },
       "stove_ip": {
         "name": "Kaminen IP-adress"
       },
@@ -206,6 +215,12 @@
       },
       "app_change_detected": {
         "name": "Extern Ändring Upptäckt"
+      },
+      "high_smoke_temp_alert": {
+        "name": "Varning hög röktemperatur"
+      },
+      "low_wood_temp_alert": {
+        "name": "Varning låg röktemperatur"
       }
     },
     "switch": {

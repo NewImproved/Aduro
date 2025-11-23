@@ -174,6 +174,12 @@
       "consumption_year": {
         "name": "This Year's Consumption"
       },
+      "monthly_history": {
+        "name": "Monthly consumption history"
+      },
+      "yearly_history": {
+        "name": "Yearly consumption history"
+      },
       "stove_ip": {
         "name": "Stove IP Address"
       },
@@ -215,6 +221,12 @@
       },
       "app_change_detected": {
         "name": "External Change Detected"
+      },
+      "high_smoke_temp_alert": {
+        "name": "High smoke temp alert"
+      },
+      "low_wood_temp_alert": {
+        "name": "Low wood temp alert"
       }
     },
     "switch": {

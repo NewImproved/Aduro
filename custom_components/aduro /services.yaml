@@ -55,12 +55,12 @@ set_operation_mode:
       selector:
         select:
           options:
-            - label: "Heat Level"
-              value: 0
-            - label: "Temperature"
-              value: 1
-            - label: "Wood"
-              value: 2
+            - value: "0"
+              label: "Heat Level"
+            - value: "1"
+              label: "Temperature"
+            - value: "2"
+              label: "Wood"
 
 toggle_mode:
   name: Toggle Mode

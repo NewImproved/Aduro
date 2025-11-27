@@ -54,6 +54,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register options update listener
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
+    # Register services
+    await async_setup_services(hass, coordinator)
+
     return True
 
 async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -109,6 +112,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
+
+        # Unregister services if this is the last entry
+        if not hass.data[DOMAIN]:
+            await async_unload_services(hass)
 
     return unload_ok
 

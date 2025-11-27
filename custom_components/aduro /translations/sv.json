@@ -18,7 +18,7 @@
     "error": {
       "missing_serial": "Serienummer krävs",
       "missing_pin": "PIN-kod krävs",
-      "invalid_ip": "Ogiltigt format för IP address",
+      "invalid_ip": "Ogiltigt format för IP adress",
       "cannot_connect": "Kunde inte ansluta",
       "unknown": "Oväntat fel"
     },

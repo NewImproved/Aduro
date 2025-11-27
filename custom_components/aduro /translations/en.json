@@ -7,13 +7,18 @@
         "data": {
           "stove_serial": "Stove Serial Number",
           "stove_pin": "Stove PIN",
-          "stove_model": "Stove Model"
+          "stove_model": "Stove Model",
+          "stove_ip": "Fixed IP Address (Optional)"
+        },
+        "data_description": {
+          "stove_ip": "Leave empty for automatic discovery, or enter a fixed IP address"
         }
       }
     },
     "error": {
       "missing_serial": "Serial number is required",
       "missing_pin": "PIN is required",
+      "invalid_ip": "Invalid IP address format",
       "cannot_connect": "Failed to connect",
       "unknown": "Unexpected error"
     },
@@ -25,7 +30,14 @@
     "step": {
       "init": {
         "title": "Configure Aduro Stove",
-        "description": "Choose a configuration area",
+        "description": "Update stove settings",
+        "data": {
+          "stove_model": "Stove Model",
+          "stove_ip": "Fixed IP Address (Optional)"
+        },
+        "data_description": {
+          "stove_ip": "Leave empty for automatic discovery, or enter a fixed IP address"
+        },
         "menu_options": {
           "pellet_settings": "Pellet Settings",
           "temperature_alerts": "Temperature Alerts",

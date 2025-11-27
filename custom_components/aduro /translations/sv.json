@@ -7,13 +7,18 @@
         "data": {
           "stove_serial": "Kamins Serienummer",
           "stove_pin": "Kamins PIN-kod",
-          "stove_model": "Kaminmodell"
+          "stove_model": "Kaminmodell",
+          "stove_ip": "Fast IP Address (Valfritt)"
+        },
+        "data_description": {
+          "stove_ip": "Lämna tom för automatisk anslutning, eller fyll i för fast IP-adress"
         }
       }
     },
     "error": {
       "missing_serial": "Serienummer krävs",
       "missing_pin": "PIN-kod krävs",
+      "invalid_ip": "Ogiltigt format för IP address",
       "cannot_connect": "Kunde inte ansluta",
       "unknown": "Oväntat fel"
     },
@@ -26,6 +31,13 @@
       "init": {
         "title": "Konfigurera Aduro Kamin",
         "description": "Välj ett konfigurationsområde",
+        "data": {
+          "stove_model": "Kaminmodell",
+          "stove_ip": "Fast IP Address (Valfritt)"
+        },
+        "data_description": {
+          "stove_ip": "Lämna tom för automatisk anslutning, eller fyll i för fast IP-adress"
+        },
         "menu_options": {
           "pellet_settings": "Pelletsinställningar",
           "temperature_alerts": "Temperaturvarningar",

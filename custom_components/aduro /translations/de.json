@@ -90,7 +90,7 @@
   },
   "entity": {
     "sensor": {
-      "state": {
+      "state_disp": {
         "name": "Zustand",
         "state": {
           "state_operating": "Leistung {heatlevel}",
@@ -121,7 +121,7 @@
           "substate_by_button": "Per Taste",
           "substate_wood_burning_question": "Holzverbrennung?",
           "substate_no_fuel": "Kein Brennstoff",
-          "substate_unknown": "Unbekannt",
+          "substate_luke_offen": "Luke offen",
           "substate_heating_up": "Aufheizen",
           "substate_check_burn_cup": "Brennertopf prüfen"
         }

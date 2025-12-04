@@ -198,7 +198,7 @@ class AduroStateSensor(AduroSensorBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "state", "state")
+        super().__init__(coordinator, entry, "state", "state_disp")
         self._attr_icon = "mdi:state-machine"
         self._attr_device_class = SensorDeviceClass.ENUM
         self._attr_options = [
@@ -247,7 +247,7 @@ class AduroSubstateSensor(AduroSensorBase):
             "substate_by_button",
             "substate_wood_burning_question",
             "substate_no_fuel",
-            "substate_unknown",
+            "substate_door_open",
             "substate_heating_up",
             "substate_check_burn_cup",
         ]

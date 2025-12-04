@@ -90,7 +90,7 @@
   },
   "entity": {
     "sensor": {
-      "state": {
+      "state_disp": {
         "name": "Tillstånd",
         "state": {
           "state_operating": "Drift {heatlevel}",
@@ -112,7 +112,7 @@
           "substate_by_button": "På knapp",
           "substate_wood_burning_question": "Vedeldning?",
           "substate_no_fuel": "Inget bränsle",
-          "substate_unknown": "Okänd",
+          "substate_door_open": "Lucka öppen",
           "substate_heating_up": "Värmer upp",
           "substate_check_burn_cup": "Kontrollera brännkoppen"
         }

@@ -10,6 +10,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN
 from .coordinator import AduroCoordinator
@@ -39,6 +40,8 @@ async def async_setup_entry(
 class AduroButtonBase(CoordinatorEntity, ButtonEntity):
     """Base class for Aduro buttons."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: AduroCoordinator,
@@ -49,10 +52,29 @@ class AduroButtonBase(CoordinatorEntity, ButtonEntity):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entry = entry
-        self._attr_has_entity_name = True
         self._attr_unique_id = f"{entry.entry_id}_{button_type}"
         self._attr_translation_key = translation_key
+        self._entity_id_suffix = button_type
         self._button_type = button_type
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        
+        # Force the entity_id to be in English
+        registry = er.async_get(self.hass)
+        
+        # Construct the desired English entity_id
+        desired_entity_id = f"button.{DOMAIN}_{self.coordinator.stove_model.lower()}_{self._entity_id_suffix}"
+        
+        # Get the current entity from registry
+        current_entry = registry.async_get(self.entity_id)
+        
+        # If entity_id doesn't match what we want, update it
+        if current_entry and self.entity_id != desired_entity_id:
+            _LOGGER.debug(f"Setting entity_id to {desired_entity_id}")
+            registry.async_update_entity(self.entity_id, new_entity_id=desired_entity_id)
+
 
     def combined_firmware_version(self) -> str | None:
         """Return combined firmware version string."""

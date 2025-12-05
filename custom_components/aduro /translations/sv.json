@@ -198,6 +198,9 @@
       "stove_mac": {
         "name": "MAC-adress"
       },
+      "firmware_version": {
+        "name": "Firmware version"
+      },
       "timer_startup_1": {
         "name": "Tändningstimer 1"
       },

@@ -242,10 +242,10 @@
       "power": {
         "name": "Ström"
       },
-      "auto_shutdown": {
+      "auto_shutdown_at_low_pellets": {
         "name": "Automatisk Avstängning vid Låga Pellets"
       },
-      "auto_resume_wood": {
+      "auto_resume_after_wood_mode": {
         "name": "Automatisk Återstart Efter Vedläge"
       }
     },
@@ -259,10 +259,10 @@
       "pellet_capacity": {
         "name": "Pelletskapacitet"
       },
-      "notification_level": {
+      "low_pellet_notification_level": {
         "name": "Låg Pellets Notifieringsnivå"
       },
-      "shutdown_level": {
+      "auto_shutdown_pellet_level": {
         "name": "Automatisk Avstängnings Pelletsnivå"
       },
       "high_smoke_temp_threshold": {
@@ -288,7 +288,7 @@
       "toggle_mode": {
         "name": "Växla Läge"
       },
-      "resume_after_wood": {
+      "resume_after_wood_mode": {
         "name": "Återuppta Efter Vedläge"
       },
       "force_auger": {

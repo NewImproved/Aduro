@@ -265,7 +265,7 @@
       "heatlevel": {
         "name": "Heizstufe"
       },
-      "temperature": {
+      "target_temperature": {
         "name": "Solltemperatur"
       },
       "pellet_capacity": {

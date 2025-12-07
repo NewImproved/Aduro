@@ -298,7 +298,7 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the button."""
-        super().__init__(coordinator, entry, "resume_after_wood_mode", "resume_after_wood_mode")
+        super().__init__(coordinator, entry, "resume_after_wood", "resume_after_wood")
         self._attr_icon = "mdi:play-circle"
 
     @property
@@ -308,7 +308,7 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
             return {}
         
         current_state = self.coordinator.data["operating"].get("state", "")
-        in_wood_mode = current_state in ["9"]
+        in_wood_mode = current_state in ["9", "14"]
         
         attrs = {
             "current_state": current_state,
@@ -340,7 +340,7 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
         
         current_state = self.coordinator.data["operating"].get("state", "")
         
-        if current_state not in ["9"]:
+        if current_state not in ["9", "14"]:
             _LOGGER.warning(
                 "Button: Cannot resume - stove not in wood mode (current state: %s)",
                 current_state

@@ -188,7 +188,7 @@ class AduroHeatlevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "heatlevel", "heatlevel")
+        super().__init__(coordinator, entry, "heat_level", "heat_level")
         self._attr_icon = "mdi:fire"
         self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = HEAT_LEVEL_MIN

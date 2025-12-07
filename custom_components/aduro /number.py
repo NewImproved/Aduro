@@ -258,7 +258,7 @@ class AduroTemperatureNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "temperature", "temperature")
+        super().__init__(coordinator, entry, "target_temperature", "target_temperature")
         self._attr_icon = "mdi:thermometer"
         self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = TEMP_MIN

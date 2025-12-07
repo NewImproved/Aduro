@@ -271,7 +271,7 @@
       "heatlevel": {
         "name": "Heat Level"
       },
-      "temperature": {
+      "target_temperature": {
         "name": "Target Temperature"
       },
       "pellet_capacity": {

@@ -254,27 +254,27 @@
       "power": {
         "name": "Strom"
       },
-      "auto_shutdown_at_low_pellets": {
+      "auto_shutdown": {
         "name": "Automatische Abschaltung bei niedrigem Pelletstand"
       },
-      "auto_resume_after_wood_mode": {
+      "auto_resume_wood": {
         "name": "Automatische Wiederaufnahme nach Holzmodus"
       }
     },
     "number": {
-      "heat_level": {
+      "heatlevel": {
         "name": "Heizstufe"
       },
-      "target_temperature": {
+      "temperature": {
         "name": "Solltemperatur"
       },
       "pellet_capacity": {
         "name": "Pelletkapazität"
       },
-      "low_pellet_notification_level": {
+      "notification_level": {
         "name": "Benachrichtigungsstufe für niedrigen Pelletstand"
       },
-      "auto_shutdown_pellet_level": {
+      "shutdown_level": {
         "name": "Abschaltpelletstand"
       },
       "high_smoke_temp_threshold": {
@@ -306,7 +306,7 @@
       "toggle_mode": {
         "name": "Modus umschalten"
       },
-      "resume_after_wood_mode": {
+      "resume_after_wood": {
         "name": "Nach Holzmodus fortsetzen"
       },
       "force_auger": {

@@ -219,7 +219,7 @@ class AduroAutoShutdownSwitch(AduroSwitchBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the switch."""
-        super().__init__(coordinator, entry, "auto_shutdown_at_low_pellets", "auto_shutdown_at_low_pellets")
+        super().__init__(coordinator, entry, "auto_shutdown", "auto_shutdown")
         self._attr_icon = "mdi:power-settings"
 
     @property
@@ -269,7 +269,7 @@ class AduroAutoResumeAfterWoodSwitch(AduroSwitchBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the switch."""
-        super().__init__(coordinator, entry, "auto_resume_after_wood_mode", "auto_resume_after_wood_mode")
+        super().__init__(coordinator, entry, "auto_resume_wood", "auto_resume_wood")
         self._attr_icon = "mdi:restart"
 
     @property

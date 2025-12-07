@@ -188,7 +188,7 @@ class AduroHeatlevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "heat_level", "heat_level")
+        super().__init__(coordinator, entry, "heatlevel", "heatlevel")
         self._attr_icon = "mdi:fire"
         self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = HEAT_LEVEL_MIN
@@ -258,7 +258,7 @@ class AduroTemperatureNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "target_temperature", "target_temperature")
+        super().__init__(coordinator, entry, "temperature", "temperature")
         self._attr_icon = "mdi:thermometer"
         self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = TEMP_MIN
@@ -373,7 +373,7 @@ class AduroNotificationLevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "low_pellet_notification_level", "low_pellet_notification_level")
+        super().__init__(coordinator, entry, "notification_level", "notification_level")
         self._attr_icon = "mdi:bell-alert"
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = NOTIFICATION_LEVEL_MIN
@@ -422,7 +422,7 @@ class AduroShutdownLevelNumber(AduroNumberBase):
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the number entity."""
-        super().__init__(coordinator, entry, "auto_shutdown_pellet_level", "auto_shutdown_pellet_level")
+        super().__init__(coordinator, entry, "shutdown_level", "shutdown_level")
         self._attr_icon = "mdi:power-off"
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = SHUTDOWN_LEVEL_MIN

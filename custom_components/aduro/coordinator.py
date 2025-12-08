@@ -85,8 +85,8 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Pellet tracking
         self._pellet_capacity = 9.5  # kg, configurable
-        self._pellets_consumed = 0.0  # kg - accumulated from daily increments
-        self._refill_counter = 0
+        self._pellets_consumed = 0.0  # kg - accumulated since last refill
+        self._pellets_consumed_total = 0.0  # kg - accumulated since last cleaning
         self._notification_level = 10  # % remaining when to notify
         self._shutdown_level = 5  # % remaining when to auto-shutdown
         self._auto_shutdown_enabled = False
@@ -305,6 +305,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             current_heatlevel = data["operating"].get("heatlevel")
             current_operation_mode = data["status"].get("operation_mode")
             current_temperature_ref = data["operating"].get("boiler_ref")
+            smoke_temp = data["operating"].get("smoke_temp", 0)
             
             _LOGGER.debug(
                 "State change check - Previous HL: %s, Current HL: %s, Previous Mode: %s, Current Mode: %s, Change in progress: %s",
@@ -326,8 +327,8 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._pre_wood_mode_temperature = current_temperature_ref
                 self._was_in_wood_mode = True
                 
-                # NEW: Trigger auto-resume immediately when entering wood mode
-                if self._auto_resume_after_wood:
+                # Trigger auto-resume if mode is heat level and temperature under 110 (to give margin for 100 degrees).
+                if self._auto_resume_after_wood and current_operation_mode == 0 and smoke_temp <= 110:
                     _LOGGER.info("Auto-resume enabled, sending resume command to stove")
                     success = await self._async_resume_pellet_operation()
                     if success:
@@ -666,19 +667,21 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._last_consumption_day_value,
                 current_day_consumption
             )
-            # Update baseline to new (reset) value, don't change pellets_consumed
+            # Update baseline to new (reset) value, don't change counters
             self._last_consumption_day_value = current_day_consumption
             
         # Handle normal consumption increase
         elif consumption_change > 0:
-            # Add the increment to total consumed
+            # Add the increment to BOTH counters
             self._pellets_consumed += consumption_change
+            self._pellets_consumed_total += consumption_change
             self._last_consumption_day_value = current_day_consumption
             
             _LOGGER.debug(
-                "Consumption increment: +%.2f kg (total consumed: %.2f kg, today: %.2f kg)",
+                "Consumption increment: +%.2f kg (since refill: %.2f kg, since cleaning: %.2f kg, today: %.2f kg)",
                 consumption_change,
                 self._pellets_consumed,
+                self._pellets_consumed_total,
                 current_day_consumption
             )
         
@@ -697,9 +700,9 @@ class AduroCoordinator(DataUpdateCoordinator):
         pellets = {
             "capacity": self._pellet_capacity,
             "consumed": self._pellets_consumed,
+            "consumed_total": self._pellets_consumed_total,  # NEW: Total since cleaning
             "amount": amount_remaining,
             "percentage": percentage_remaining,
-            "refill_counter": self._refill_counter,
             "notification_level": self._notification_level,
             "shutdown_level": self._shutdown_level,
             "auto_shutdown_enabled": self._auto_shutdown_enabled,
@@ -1279,9 +1282,13 @@ class AduroCoordinator(DataUpdateCoordinator):
             data = await self._store.async_load()
             if data:
                 self._pellets_consumed = data.get("pellets_consumed", 0.0)
-                self._refill_counter = data.get("refill_counter", 0)
+                self._pellets_consumed_total = data.get("pellets_consumed_total", 0.0)
                 self._consumption_snapshots = data.get("consumption_snapshots", {})
                 self._snapshots_initialized = data.get("snapshots_initialized", False)
+                
+                # Load user preferences
+                self._auto_resume_after_wood = data.get("auto_resume_after_wood", False)
+                self._auto_shutdown_enabled = data.get("auto_shutdown_enabled", False)
                 
                 # Convert last_consumption_day string back to date object
                 last_day_str = data.get("last_consumption_day")
@@ -1290,9 +1297,12 @@ class AduroCoordinator(DataUpdateCoordinator):
                     self._last_consumption_day = datetime.fromisoformat(last_day_str).date()
                 
                 _LOGGER.info(
-                    "Loaded pellet data from storage - consumed: %.2f kg, refills: %d, days: %d",
+                    "Loaded pellet data from storage - consumed: %.2f kg, total consumed: %.2f kg, "
+                    "auto_resume: %s, auto_shutdown: %s",
                     self._pellets_consumed,
-                    self._refill_counter
+                    self._pellets_consumed_total,
+                    self._auto_resume_after_wood,
+                    self._auto_shutdown_enabled
                 )
             else:
                 _LOGGER.debug("No stored pellet data found, starting fresh")
@@ -1304,10 +1314,13 @@ class AduroCoordinator(DataUpdateCoordinator):
         try:
             data = {
                 "pellets_consumed": self._pellets_consumed,
-                "refill_counter": self._refill_counter,
+                "pellets_consumed_total": self._pellets_consumed_total,
                 "consumption_snapshots": self._consumption_snapshots,
                 "snapshots_initialized": getattr(self, '_snapshots_initialized', False),
                 "last_consumption_day": self._last_consumption_day.isoformat() if self._last_consumption_day else None,
+                # Save user preferences
+                "auto_resume_after_wood": self._auto_resume_after_wood,
+                "auto_shutdown_enabled": self._auto_shutdown_enabled,
             }
             await self._store.async_save(data)
             _LOGGER.debug("Saved pellet data to storage")
@@ -1333,26 +1346,30 @@ class AduroCoordinator(DataUpdateCoordinator):
         else:
             self._consumption_at_refill = 0.0
         
-        # Reset all tracking
+        # Reset only the per-refill counter, NOT the total counter
+        old_consumed = self._pellets_consumed
         self._pellets_consumed = 0.0
         self._last_consumption_day = date.today()
-        self._refill_counter += 1
         self._low_pellet_notification_sent = False
         self._shutdown_notification_sent = False
         
         _LOGGER.info(
-            "Pellets refilled - counter: %d, capacity: %.1f kg, date: %s",
-            self._refill_counter,
+            "Pellets refilled - reset consumed from %.2f to 0.0 kg, capacity: %.1f kg, total consumed since cleaning: %.2f kg",
+            old_consumed,
             self._pellet_capacity,
-            self._last_consumption_day
+            self._pellets_consumed_total
         )
 
         asyncio.create_task(self.async_save_pellet_data())
 
     def reset_refill_counter(self) -> None:
-        """Reset refill counter after cleaning."""
-        self._refill_counter = 0
-        _LOGGER.info("Refill counter reset")
+        """Reset total consumption counter after cleaning."""
+        old_total = self._pellets_consumed_total
+        self._pellets_consumed_total = 0.0
+        _LOGGER.info(
+            "Stove cleaned - total consumption counter reset from %.2f to 0.0 kg",
+            old_total
+        )
 
         asyncio.create_task(self.async_save_pellet_data())
 

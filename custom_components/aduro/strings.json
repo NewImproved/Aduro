@@ -126,6 +126,20 @@
           "substate_check_burn_cup": "Check burn cup"
         }
       },
+      "consumption_since_cleaning": {
+        "name": "Consumption Since Cleaning",
+        "state_attributes": {
+          "consumed_since_refill": {
+            "name": "Consumed Since Refill"
+          },
+          "consumed_since_cleaning": {
+            "name": "Consumed Since Cleaning"
+          },
+          "pellet_capacity": {
+            "name": "Pellet Capacity"
+          }
+        }
+      },
       "status_main": {
         "name": "Status"
       },
@@ -170,9 +184,6 @@
       },
       "consumption_total": {
         "name": "Consumption Total"
-      },
-      "refill_counter": {
-        "name": "Refill Counter"
       },
       "consumption_day": {
         "name": "Consumption Today"

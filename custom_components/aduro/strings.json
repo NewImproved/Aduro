@@ -243,7 +243,18 @@
         "name": "Change In Progress"
       },
       "display_format": {
-        "name": "Display Format"
+        "name": "Display Format",
+        "state_attributes": {
+          "heatlevel_format": {
+            "name": "Heat Level (room temp.): {display_target} ({current_temperature})°C"
+          },
+          "temperature_format": {
+            "name": "Target temp. (room temp.): {display_target} ({current_temperature})°C"
+          },
+          "wood_mode": {
+            "name": "Wood Mode"
+          }
+        }
       },
       "display_target": {
         "name": "Display Target"

@@ -126,6 +126,20 @@
           "substate_check_burn_cup": "Brennertopf prüfen"
         }
       },
+      "consumption_since_cleaning": {
+        "name": "Verbrauch seit der Reinigung",
+        "state_attributes": {
+          "consumed_since_refill": {
+            "name": "Verbraucht seit Nachfüllung"
+          },
+          "consumed_since_cleaning": {
+            "name": "Verbrauch seit der Reinigung"
+          },
+          "pellet_capacity": {
+            "name": "Pelletkapazität"
+          }
+        }
+      },
       "status_main": {
         "name": "Status"
       },
@@ -170,9 +184,6 @@
       },
       "consumption_total": {
         "name": "Gesamtverbrauch"
-      },
-      "refill_counter": {
-        "name": "Nachfüllzähler"
       },
       "consumption_day": {
         "name": "Heutiger Verbrauch"

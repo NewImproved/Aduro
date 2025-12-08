@@ -117,6 +117,20 @@
           "substate_check_burn_cup": "Kontrollera brännkoppen"
         }
       },
+      "consumption_since_cleaning": {
+        "name": "Förbrukning sedan rengörning",
+        "state_attributes": {
+          "consumed_since_refill": {
+            "name": "Förbrukning sedan påfyllning"
+          },
+          "consumed_since_cleaning": {
+            "name": "Förbrukning sedan rengörning"
+          },
+          "pellet_capacity": {
+            "name": "Pelletskapacitet"
+          }
+        }
+      },
       "status_main": {
         "name": "Status"
       },
@@ -161,9 +175,6 @@
       },
       "consumption_total": {
         "name": "Förbrukning total"
-      },
-      "refill_counter": {
-        "name": "Påfyllningsräknare"
       },
       "consumption_day": {
         "name": "Förbrukning idag"

@@ -234,7 +234,18 @@
         "name": "Ändring Pågår"
       },
       "display_format": {
-        "name": "Visningsformat"
+        "name": "Visningsformat",
+        "state_attributes": {
+          "heatlevel_format": {
+            "name": "Värmenivå (rumstemp): {display_target} ({current_temperature})°C"
+          },
+          "temperature_format": {
+            "name": "Måltemp. (rumstemp.): {display_target} ({current_temperature})°C"
+          },
+          "wood_mode": {
+            "name": "Vedläge"
+          }
+        }
       },
       "display_target": {
         "name": "Visningsmål"

@@ -1,0 +1,405 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurer le poêle hybride Aduro",
+        "description": "Entre les details de connexion du poêle",
+        "data": {
+          "stove_serial": "Poêle Serial Number",
+          "stove_pin": "Poêle PIN",
+          "stove_model": "Poêle Model",
+          "stove_ip": "Adresse IP fixe (Optionel)"
+        },
+        "data_description": {
+          "stove_ip": "Laisser vide pour la découverte automatique ou entrer une adresse IP fixe"
+        }
+      }
+    },
+    "error": {
+      "missing_serial": "Serial number est requis",
+      "missing_pin": "PIN est requis",
+      "invalid_ip": "Adresse IP invalide",
+      "cannot_connect": "échec de connexion",
+      "unknown": "Erreur inconnue"
+    },
+    "abort": {
+      "already_configured": "Ce poêle est déjà configuré"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configurer poêle Aduro",
+        "description": "Mise à jour des paramétres du poêle",
+        "data": {
+          "stove_model": "Modèle du poêle",
+          "stove_ip": "Adresse IP fixe (Optionnel)"
+        },
+        "data_description": {
+          "stove_ip": "Laisser vide pour la découverte automatique ou entrer une adresse IP fixe"
+        },
+        "menu_options": {
+          "pellet_settings": "Paramètres Pellet",
+          "temperature_alerts": "Alertes Temperature",
+          "advanced_settings": "Paramètres avancés"
+        }
+      },
+      "pellet_settings": {
+        "title": "Paramètres Pellet",
+        "description": "Configurer le reservoir de pellet et l'alerte de niveau bas du pellet",
+        "data": {
+          "pellet_capacity": "Capacité du réservoir de pellet (kg)",
+          "notification_level": "Notification de niveau bas de pellet (%)",
+          "shutdown_level": "Niveau d'arrêt automatique (%)",
+          "auto_shutdown_enabled": "Activer l'arrêt automatique"
+        },
+        "data_description": {
+          "pellet_capacity": "Capacité total du réservoir de pellet en kg",
+          "notification_level": "Recevoir une notification quand le niveau est en dessous de ce pourcentage",
+          "shutdown_level": "Eteindre automatiquement le poêle quand les pellets sont en dessous de ce pourcentage",
+          "auto_shutdown_enabled": "Activer l'arrêt automatique du poêle en cas de faible quantité de pellets"
+        }
+      },
+      "temperature_alerts": {
+        "title": "Configuration des température d'alertes",
+        "description": "Configurer les temperatures de monitoring et d'alertes",
+        "data": {
+          "high_smoke_temp_threshold": "Seuil de température de fumée élevée (°C)",
+          "high_smoke_duration_threshold": "Durée d'alerte fumée élevée (seconds)",
+          "low_wood_temp_threshold": "Seuil de température de fumée basse (°C)",
+          "low_wood_duration_threshold": "Durée d'alerte fumée basse (seconds)"
+        },
+        "data_description": {
+          "high_smoke_temp_threshold": "Déclencher une alerte lorsque la température des fumées dépasse cette valeur",
+          "high_smoke_duration_threshold": "Durée en secondes pendant laquelle la température doit dépasser le seuil avant déclenchement de l'alerte",
+          "low_wood_temp_threshold": "Déclencher une alerte lorsque la température en mode bois descend en dessous de cette valeur",
+          "low_wood_duration_threshold": "Durée en secondes pendant laquelle la température doit rester basse avant déclenchement de l'alerte"
+        }
+      },
+      "advanced_settings": {
+        "title": "Paramètres avancés",
+        "description": "Configurer les paramètres avancés du poêle",
+        "data": {
+          "auto_resume_after_wood": "Reprise automatique après le mode bois"
+        },
+        "data_description": {
+          "auto_resume_after_wood": "Rependre automatiquement le fonctionnement aux pellets avec les paramètres précédents lors de la sortie du mode bois"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "state": {
+        "name": "État",
+        "state": {
+          "state_operating": "En fonctionnement",
+          "state_stopped": "Arrêté",
+          "state_off": "Éteint",
+          "state_operating_iii": "Puissance III",
+          "state_stopped_draft": "Conduit de descente chaud",
+          "state_stopped_smoke_sensor": "Capteur de fumée défectueux",
+          "state_stopped_dropshaft": "Capteur de conduit de descente défectueux",
+          "state_stopped_burner_yellow": "Contrôlez le brûleur – Voyant jaune",
+          "state_stopped_auger": "Sortie de la vis sans fin externe défectueuse",
+          "state_stopped_timer": "Arrêté par la minuterie",
+          "state_operating_air_damper": "Clapet d'air fermé",
+          "state_stopped_co_sensor": "Capteur de Co défectueux",
+          "state_stopped_no_fan": "Aucune consommation électrique pour le ventilateur"
+        }
+      },
+      "substate": {
+        "name": "État secondaire",
+        "state": {
+          "substate_waiting": "Attente",
+          "substate_ignition_1": "Allumage 1",
+          "substate_ignition_2": "Allumage 2",
+          "substate_normal": "Normal",
+          "substate_temp_reached": "Température ambiante atteinte",
+          "substate_wood_burning": "Combustion du bois",
+          "substate_failed_ignition": "Allumage échoué – Ouvrez la porte et vérifiez l'accumulation de pellets dans le brûleur",
+          "substate_by_button": "Via le boutton",
+          "substate_wood_burning_question": "Combustion du bois ?",
+          "substate_no_fuel": "Pas de combustible",
+          "substate_door_open": "Porte ouverte",
+          "substate_heating_up": "En chauffe",
+          "substate_check_burn_cup": "Vérifiez le creuset de combustion"
+        }
+      },
+      "consumption_since_cleaning": {
+        "name": "Consommation depuis le nettoyage",
+        "state_attributes": {
+          "consumed_since_refill": {
+            "name": "Consommé depuis le dernier remplissage"
+          },
+          "consumed_since_cleaning": {
+            "name": "Consommé depuis le nettoyage"
+          },
+          "pellet_capacity": {
+            "name": "Capacité de pellet"
+          }
+        }
+      },
+      "status_main": {
+        "name": "Statut principal"
+      },
+      "status_sub": {
+        "name": "Statut détaillé"
+      },
+      "boiler_temp": {
+        "name": "Température d'ambiance"
+      },
+      "boiler_ref": {
+        "name": "Température cible"
+      },
+      "smoke_temp": {
+        "name": "Température des fumée"
+      },
+      "shaft_temp": {
+        "name": "Température de la vis d’alimentation"
+      },
+      "power_kw": {
+        "name": "Puissance de sortie"
+      },
+      "power_pct": {
+        "name": "Pourcentage de puissance"
+      },
+      "heatlevel": {
+        "name": "Niveau de chaleur"
+      },
+      "heatlevel_display": {
+        "name": "Affichage du niveau de chaleur"
+      },
+      "operation_mode": {
+        "name": "Mode de fonctionnement"
+      },
+      "pellet_amount": {
+        "name": "Pellets restants"
+      },
+      "pellet_percentage": {
+        "name": "Pellets pourcentage"
+      },
+      "pellet_consumed": {
+        "name": "Pellets Consommés"
+      },
+      "consumption_total": {
+        "name": "Consommation totale"
+      },
+      "consumption_day": {
+        "name": "Consommation du jour"
+      },
+      "consumption_yesterday": {
+        "name": "Consommation de la veille"
+      },
+      "consumption_month": {
+        "name": "Consommation du mois"
+      },
+      "consumption_year": {
+        "name": "Consommation de l'année"
+      },
+      "year_over_year": {
+        "name": "Historique de consommation année après année"
+      },
+      "monthly_history": {
+        "name": "Historique de consommation (mois)"
+      },
+      "yearly_history": {
+        "name": "Historique de consommation (année)"
+      },
+      "stove_ip": {
+        "name": "Adresse IP du poêle"
+      },
+      "router_ssid": {
+        "name": "Réseau WiFi"
+      },
+      "stove_rssi": {
+        "name": "Puissance du signal WiFi"
+      },
+      "stove_mac": {
+        "name": "MAC Addresse"
+      },
+      "firmware_version": {
+        "name": "Version du logiciel"
+      },
+      "timer_startup_1": {
+        "name": "Minuterie d’allumage 1"
+      },
+      "timer_startup_2": {
+        "name": "Minuterie d’allumage 2"
+      },
+      "operating_time_stove": {
+        "name": "Temps de fonctionnement total"
+      },
+      "operating_time_auger": {
+        "name": "Temps de fonctionnement de la vis d’alimentation"
+      },
+      "operating_time_ignition": {
+        "name": "Durée de fonctionnement de l’allumage"
+      },
+      "mode_transition": {
+        "name": "Changement de mode"
+      },
+      "change_in_progress": {
+        "name": "Changement en cours"
+      },
+      "display_format": {
+        "name": "Format d’affichage",
+        "state_attributes": {
+          "heatlevel_format": {
+            "name": "Niveau de chaleur (temp. pièce): {display_target} ({current_temperature})°C"
+          },
+          "temperature_format": {
+            "name": "Température cible (pièce): {display_target} ({current_temperature})°C"
+          },
+          "wood_mode": {
+            "name": "Mode bois"
+          }
+        }
+      },        
+      "display_target": {
+        "name": "Puissance cible"
+      },
+      "app_change_detected": {
+        "name": "Modification externe détectée"
+      },
+      "high_smoke_temp_alert": {
+        "name": "Alerte température des fumées élevée"
+      },
+      "low_wood_temp_alert": {
+        "name": "Alerte température du bois trop basse"
+      },
+      "carbon_monoxide": {
+      "name": "Niveau de Co"
+      },
+      "carbon_monoxide_yellow": {
+        "name": "Niveau d'alerte CO (jaune)"
+      },
+      "carbon_monoxide_red": {
+        "name": "Niveau d'alerte CO (rouge)"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Marche/Arrêt"
+      },
+      "auto_shutdown_at_low_pellets": {
+        "name": "Arrêt automatique pellet bas"
+      },
+      "auto_resume_after_wood_mode": {
+        "name": "Reprise automatique après le mode bois"
+      }
+    },
+    "number": {
+      "heat_level": {
+        "name": "Niveau de chaleur"
+      },
+      "target_temperature": {
+        "name": "Température cible"
+      },
+      "pellet_capacity": {
+        "name": "Capacité de pellet"
+      },
+      "low_pellet_notification_level": {
+        "name": "Seuil d'alerte de niveau bas de pellets"
+      },
+      "auto_shutdown_pellet_level": {
+        "name": "Niveau de pellets pour arrêt automatique"
+      },
+      "high_smoke_temp_threshold": {
+        "name": "Seuil de température élevée des fumées"
+      },
+      "high_smoke_duration_threshold": {
+        "name": "Seuil de durée de température élevée des fumées"
+      },
+      "low_wood_temp_threshold": {
+        "name": "Seuil de température basse du bois"
+      },
+      "low_wood_duration_threshold": {
+        "name": "Seuil de durée de température basse du bois"
+      }
+    },
+    "button": {
+      "refill_pellets": {
+        "name": "Recharge des pellets"
+      },
+      "clean_stove": {
+        "name": "Nettoyage du poêle"
+      },
+      "toggle_mode": {
+        "name": "Changer de mode"
+      },
+      "resume_after_wood": {
+        "name": "Reprendre après le mode bois"
+      },
+      "force_auger": {
+        "name": "Forcer la vis d'alimentation"
+      }
+    }
+  },
+  "services": {
+    "start_stove": {
+      "name": "Démarrer le poêle",
+      "description": "Démarre le fonctionnement du poêle à granulés."
+    },
+    "stop_stove": {
+      "name": "Arrêter le poêle",
+      "description": "Arrête le fonctionnement du poêle à granulés."
+    },
+    "set_heatlevel": {
+      "name": "Définir le niveau de chaleur",
+      "description": "Définir le niveau de chaleur du poêle (1-3). Passe également en mode de fonctionnement par niveau de chaleur.",
+      "fields": {
+        "heatlevel": {
+          "name": "Niveau de chaleur",
+          "description": "Niveau de chaleur à définir (1=Faible, 2=Moyen, 3=Élevé)."
+        }
+      }
+    },
+    "set_temperature": {
+      "name": "Définir la température",
+      "description": "Définir la température cible de la pièce. Passe également en mode de fonctionnement par température.",
+      "fields": {
+        "temperature": {
+          "name": "Température",
+          "description": "Température cible en degrés Celsius."
+        }
+      }
+    },
+    "set_operation_mode": {
+      "name": "Définir le mode de fonctionnement",
+      "description": "Définir le mode de fonctionnement du poêle.",
+      "fields": {
+        "mode": {
+          "name": "Mode de fonctionnement",
+          "description": "Mode de fonctionnement : 0=Niveau de chaleur, 1=Température, 2=Bois"
+        }
+      }
+    },
+    "toggle_mode": {
+      "name": "Basculer le mode",
+      "description": "Basculer entre les modes de fonctionnement par niveau de chaleur et par température."
+    },
+    "resume_after_wood_mode": {
+      "name": "Reprendre après le mode bois",
+      "description": "Reprend le fonctionnement aux pellets après le mode bois, en restaurant les paramètres précédents."
+    },
+    "force_auger": {
+      "name": "Forcer la vis d’alimentation",
+      "description": "Forcer le fonctionnement de la vis d’alimentation (pour test ou débloquer un bourrage)."
+    },
+    "set_custom": {
+      "name": "Définir un paramètre personnalisé",
+      "description": "Définir un paramètre personnalisé du poêle par chemin et valeur (avancé).",
+      "fields": {
+        "path": {
+          "name": "Chemin du paramètre",
+          "description": "Le chemin du paramètre (ex. : 'auger.forced_run')."
+        },
+        "value": {
+          "name": "Valeur",
+          "description": "La valeur à définir (peut être une chaîne, un nombre ou un booléen)."
+        }
+      }
+    }
+  }
+}

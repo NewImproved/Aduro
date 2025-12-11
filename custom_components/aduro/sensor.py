@@ -218,35 +218,108 @@ class AduroSensorBase(CoordinatorEntity, SensorEntity):
 class AduroStateSensor(AduroSensorBase):
     """Sensor for stove state."""
 
+    # Map heatlevel numbers to Roman numerals
+    HEATLEVEL_ROMAN = {
+        1: "I",
+        2: "II",
+        3: "III",
+    }
+
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "state", "state")
         self._attr_icon = "mdi:state-machine"
-        self._attr_device_class = SensorDeviceClass.ENUM
-        self._attr_options = [
-            "state_operating",
-            "state_stopped",
-            "state_off",
-            "state_operating_iii",
-            "state_stopped_draft",
-            "state_stopped_smoke_sensor",
-            "state_stopped_dropshaft",
-            "state_stopped_burner_yellow",
-            "state_stopped_auger",
-            "state_stopped_timer",
-            "state_operating_air_damper",
-            "state_stopped_co_sensor",
-            "state_stopped_no_fan",
-        ]
+        # DON'T use device_class ENUM when you want to return translated strings
+        # self._attr_device_class = SensorDeviceClass.ENUM
+        # self._attr_options = [...]
+        self._translations = {}
+        self._translations_loaded = False
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        await self._load_translations()
+
+    async def _load_translations(self) -> None:
+        """Load translations for the current language."""
+        try:
+            language = self.hass.config.language
+            self._translations = await trans_helper.async_get_translations(
+                self.hass,
+                language,
+                "entity",
+                {DOMAIN},
+            )
+            self._translations_loaded = True
+            _LOGGER.debug("Loaded translations for language: %s", language)
+        except Exception as err:
+            _LOGGER.warning("Failed to load translations: %s", err)
+            self._translations_loaded = False
+
+    def _get_translated_state(self, translation_key: str, heatlevel: int = 1) -> str:
+        """Get translated state string with formatting."""
+        # Convert heatlevel to Roman numeral
+        heatlevel_roman = self.HEATLEVEL_ROMAN.get(heatlevel, "I")
+        
+        # Build the full translation key
+        full_key = f"component.{DOMAIN}.entity.sensor.state_disp.state.{translation_key}"
+        
+        # Try to get translation
+        if self._translations_loaded and full_key in self._translations:
+            template = self._translations[full_key]
+            try:
+                # Format with Roman numeral heatlevel
+                return template.format(heatlevel=heatlevel_roman)
+            except (KeyError, ValueError):
+                return template
+        
+        # Fallback to English with Roman numerals
+        fallback_translations = {
+            "state_operating": f"Power {heatlevel_roman}",
+            "state_stopped": "Stopped",
+            "state_off": "Off",
+            "state_operating_iii": "Power III",
+            "state_stopped_draft": "Dropshaft hot",
+            "state_stopped_smoke_sensor": "Bad smoke sensor",
+            "state_stopped_dropshaft": "Bad dropshaft sensor",
+            "state_stopped_burner_yellow": "Check burner yellow",
+            "state_stopped_auger": "bad external auger output",
+            "state_stopped_timer": "Stopped by timer",
+            "state_operating_air_damper": "Air damper closed",
+            "state_stopped_co_sensor": "Co sensor defect",
+            "state_stopped_no_fan": "No power consumption for fan",
+        }
+        
+        return fallback_translations.get(translation_key, translation_key)
 
     @property
     def native_value(self) -> str | None:
-        """Return the state translation key."""
-        if self.coordinator.data and "operating" in self.coordinator.data:
-            state = self.coordinator.data["operating"].get("state")
-            # Return translation key
-            return STATE_NAMES.get(state, "state_unknown")
-        return None
+        """Return the translated and formatted state."""
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return None
+        
+        state = self.coordinator.data["operating"].get("state")
+        heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
+        
+        # Get translation key from const
+        translation_key = STATE_NAMES.get(state, "state_unknown")
+        
+        # Return translated and formatted string with Roman numerals
+        return self._get_translated_state(translation_key, heatlevel)
+    
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        if not self.coordinator.data or "operating" not in self.coordinator.data:
+            return {}
+        
+        heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
+        
+        return {
+            "heatlevel": heatlevel,
+            "heatlevel_roman": self.HEATLEVEL_ROMAN.get(heatlevel, "I"),
+            "raw_state": self.coordinator.data["operating"].get("state"),
+        }
 
 
 class AduroSubstateSensor(AduroSensorBase):
@@ -1237,12 +1310,14 @@ class AduroModeTransitionSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "mode_transition", "mode_transition")
         self._attr_icon = "mdi:state-machine"
+        self._last_logged_value = None
 
     @property
     def native_value(self) -> str | None:
         """Return the mode transition state."""
         if self.coordinator.data and "calculated" in self.coordinator.data:
-            return self.coordinator.data["calculated"].get("mode_transition", "idle")
+            value = self.coordinator.data["calculated"].get("mode_transition", "idle")
+            return value
         return "idle"
 
 
@@ -1253,13 +1328,15 @@ class AduroChangeInProgressSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "change_in_progress", "change_in_progress")
         self._attr_icon = "mdi:sync"
+        self._last_logged_value = None
 
     @property
     def native_value(self) -> str | None:
         """Return true/false as string."""
         if self.coordinator.data and "calculated" in self.coordinator.data:
             in_progress = self.coordinator.data["calculated"].get("change_in_progress", False)
-            return "true" if in_progress else "false"
+            value = "true" if in_progress else "false"            
+            return value
         return "false"
 
 

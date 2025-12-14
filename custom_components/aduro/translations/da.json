@@ -1,0 +1,405 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sæt din Aduro Hybrid brændeovn op",
+        "description": "Indtast forbindelsesdetaljer",
+        "data": {
+          "stove_serial": "Serienummer",
+          "stove_pin": "PIN",
+          "stove_model": "Model",
+          "stove_ip": "Fast IP adresse (frivilligt)"
+        },
+        "data_description": {
+          "stove_ip": "Efterlad tomt for at automatisk finde brændeovnen, eller indtast en fast IP adresse"
+        }
+      }
+    },
+    "error": {
+      "missing_serial": "Serienummer er påkrævet",
+      "missing_pin": "PIN er påkrævet",
+      "invalid_ip": "Ugyldig IP adresse",
+      "cannot_connect": "Kunne ikke forbinde",
+      "unknown": "Uventet fejl"
+    },
+    "abort": {
+      "already_configured": "Brændeovnen er allerede sat op"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sæt din Aduro Hybrid brændeovn op",
+        "description": "Opdater indstillinger",
+        "data": {
+          "stove_model": "Model",
+          "stove_ip": "Fast IP adresse (frivilligt)"
+        },
+        "data_description": {
+          "stove_ip": "Efterlad tomt for at automatisk finde brændeovnen, eller indtast en fast IP adresse"
+        },
+        "menu_options": {
+          "pellet_settings": "Indstillinger for piller",
+          "temperature_alerts": "Temperatur alarmer",
+          "advanced_settings": "Avancerede indstillinger"
+        }
+      },
+      "pellet_settings": {
+        "title": "Indstillinger for piller",
+        "description": "Indstil pillebeholder og alarmer for lav tilstand",
+        "data": {
+          "pellet_capacity": "Pilleneholder kapacitet (kg)",
+          "notification_level": "Advarsel om lavt niveau af piller (%)",
+          "shutdown_level": "Autosluk ved meget lavt niveau (%)",
+          "auto_shutdown_enabled": "Aktiver autosluk"
+        },
+        "data_description": {
+          "pellet_capacity": "Maksimal beholdning af piller i Kilogram",
+          "notification_level": "Få en notifikation når mængden af piller falder til under denne mængde",
+          "shutdown_level": "Sluk automatisk brændeovnen når mængden af piller falder til under denne mængde",
+          "auto_shutdown_enabled": "Lad brændeovnen slkke autoatisk ved lavt pilleniveau"
+        }
+      },
+      "temperature_alerts": {
+        "title": "Indstillinger for temperaturalarmer",
+        "description": "Indstil temperaturovervågning og alarmer",
+        "data": {
+          "high_smoke_temp_threshold": "Høj røgtemperatur grænse (°C)",
+          "high_smoke_duration_threshold": "Høj røgtemperatur periode (sekunder)",
+          "low_wood_temp_threshold": "Lav brændemængde grænse (°C)",
+          "low_wood_duration_threshold": "Lav brændemængde periode (sekunder)"
+        },
+        "data_description": {
+          "high_smoke_temp_threshold": "Aktiver en alarm når røgtemperaturen går over denne grænse",
+          "high_smoke_duration_threshold": "Hvor længe skal temperaturen være over grænsen før alarmen sættes",
+          "low_wood_temp_threshold": "Aktiver en alarm når brændetemperaturen når under denne grænse",
+          "low_wood_duration_threshold": "Hvor længe skal temperaturen være under grænsen før alarmen sættes"
+        }
+      },
+      "advanced_settings": {
+        "title": "Avancerede instillinger",
+        "description": "Indstil avancerede indstillinger",
+        "data": {
+          "auto_resume_after_wood": "Autostart efter brænde-mode"
+        },
+        "data_description": {
+          "auto_resume_after_wood": "Skift automatisk til pillemode når brændemode forlades"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "state_disp": {
+        "name": "Status",
+        "state": {
+          "state_operating": "Drift {heatlevel}",
+          "state_stopped": "Stoppet",
+          "state_off": "Slukket",
+          "state_operating_iii": "Drift III",
+          "state_stopped_draft": "Faldskaft for varm",
+          "state_stopped_smoke_sensor": "Fejl på røgføler",
+          "state_stopped_dropshaft": "Fejl på føler ved faldskaft",
+          "state_stopped_burner_yellow": "Kontroller gul brænder",
+          "state_stopped_auger": "Fejl på ekstern skrue",
+          "state_stopped_timer": "Stoppet af timer",
+          "state_operating_air_damper": "Luftindtag lukket",
+          "state_stopped_co_sensor": "Fejl på kulilteføler",
+          "state_stopped_no_fan": "Fejl på blæser"
+        }
+      },
+      "substate": {
+        "name": "Understatus",
+        "state": {
+          "substate_waiting": "Vent",
+          "substate_ignition_1": "Optænding 1",
+          "substate_ignition_2": "Optænding 2",
+          "substate_normal": "Normal",
+          "substate_temp_reached": "Ønsket temperatur nået",
+          "substate_wood_burning": "Brændemode",
+          "substate_failed_ignition": "Optænding fejlede, åben lågen og kontroller brændekammeret",
+          "substate_by_button": "På knap",
+          "substate_wood_burning_question": "Brændemode?",
+          "substate_no_fuel": "Ingen brænde/piller",
+          "substate_door_open": "Dør åben",
+          "substate_heating_up": "Varmer op",
+          "substate_check_burn_cup": "Kontroller brændekammeret"
+        }
+      },
+      "consumption_since_cleaning": {
+        "name": "Forbrug siden sidste rengøring",
+        "state_attributes": {
+          "consumed_since_refill": {
+            "name": "Forbrugt siden sidste genopfyldning"
+          },
+          "consumed_since_cleaning": {
+            "name": "Forbrugt siden sidste rengøring"
+          },
+          "pellet_capacity": {
+            "name": "Pillekapacitet"
+          }
+        }
+      },
+      "status_main": {
+        "name": "Status"
+      },
+      "status_sub": {
+        "name": "Detaljeret status"
+      },
+      "boiler_temp": {
+        "name": "Rumtemperatur"
+      },
+      "boiler_ref": {
+        "name": "Måltemperatur"
+      },
+      "smoke_temp": {
+        "name": "Røgtemperatur"
+      },
+      "shaft_temp": {
+        "name": "Skafttemperatur"
+      },
+      "power_kw": {
+        "name": "Energi output"
+      },
+      "power_pct": {
+        "name": "Energi i procent"
+      },
+      "heatlevel": {
+        "name": "Varmeniveau"
+      },
+      "heatlevel_display": {
+        "name": "Varmeniveau display"
+      },
+      "operation_mode": {
+        "name": "Funktionsmåde"
+      },
+      "pellet_amount": {
+        "name": "Piller tilbage"
+      },
+      "pellet_percentage": {
+        "name": "Pillemængde i procent"
+      },
+      "pellet_consumed": {
+        "name": "Piller forbrugt"
+      },
+      "consumption_total": {
+        "name": "Totalt forbrug"
+      },
+      "consumption_day": {
+        "name": "Forbrug i dag"
+      },
+      "consumption_yesterday": {
+        "name": "Forbrug i går"
+      },
+      "consumption_month": {
+        "name": "Forbrug denne måned"
+      },
+      "consumption_year": {
+        "name": "Forbrugt dette år"
+      },
+      "year_over_year": {
+        "name": "Forbrugshistorik år for år"
+      },
+      "monthly_history": {
+        "name": "Forbrugshistorik denne måned"
+      },
+      "yearly_history": {
+        "name": "Forbrugshistorik dette år"
+      },
+      "stove_ip": {
+        "name": "IP adresse"
+      },
+      "router_ssid": {
+        "name": "WiFi netværk"
+      },
+      "stove_rssi": {
+        "name": "WiFi signalstyrke"
+      },
+      "stove_mac": {
+        "name": "MAC Adresse"
+      },
+      "firmware_version": {
+        "name": "Firmware version"
+      },
+      "timer_startup_1": {
+        "name": "Optænding 1"
+      },
+      "timer_startup_2": {
+        "name": "Optænding 2"
+      },
+      "operating_time_stove": {
+        "name": "Total brændetid"
+      },
+      "operating_time_auger": {
+        "name": "Total køretid for snegl"
+      },
+      "operating_time_ignition": {
+        "name": "Total optændingstid"
+      },
+      "mode_transition": {
+        "name": "Skift af funktionsmåde"
+      },
+      "change_in_progress": {
+        "name": "Ovnen skifter"
+      },
+      "display_format": {
+        "name": "Display Format",
+        "state_attributes": {
+          "heatlevel_format": {
+            "name": "Varmeniveau (rumtemperatur.): {display_target} ({current_temperature})°C"
+          },
+          "temperature_format": {
+            "name": "Måltemperatur. (rumtemperatur.): {display_target} ({current_temperature})°C"
+          },
+          "wood_mode": {
+            "name": "Brændemode"
+          }
+        }
+      },
+      "display_target": {
+        "name": "Visningsmål"
+      },
+      "app_change_detected": {
+        "name": "Ekstern ændring opdaget"
+      },
+      "high_smoke_temp_alert": {
+        "name": "Alarm for høj temperatur"
+      },
+      "low_wood_temp_alert": {
+        "name": "Alarm for lav temperatur"
+      },
+      "carbon_monoxide": {
+      "name": "Kulmonoxidniveau"
+      },
+      "carbon_monoxide_yellow": {
+        "name": "Kulmonoxidniveau gul"
+      },
+      "carbon_monoxide_red": {
+        "name": "Kulmonoxidniveau rød"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      },
+      "auto_shutdown_at_low_pellets": {
+        "name": "Sluk automatisk ved lav mængde piller"
+      },
+      "auto_resume_after_wood_mode": {
+        "name": "Fortsæt automatisk efter brændemode"
+      }
+    },
+    "number": {
+      "heat_level": {
+        "name": "Varmeniveau"
+      },
+      "target_temperature": {
+        "name": "Måltemperatur"
+      },
+      "pellet_capacity": {
+        "name": "Pillekapacitet"
+      },
+      "low_pellet_notification_level": {
+        "name": "Niveau for notifikation ved lav pillemængde"
+      },
+      "auto_shutdown_pellet_level": {
+        "name": "Pilleniveau for autosluk"
+      },
+      "high_smoke_temp_threshold": {
+        "name": "Grænse for høj temperatur"
+      },
+      "high_smoke_duration_threshold": {
+        "name": "Periode for høj temperatur"
+      },
+      "low_wood_temp_threshold": {
+        "name": "Grænse for lav brændetemperatur"
+      },
+      "low_wood_duration_threshold": {
+        "name": "Periode for lav brændetemperatur"
+      }
+    },
+    "button": {
+      "refill_pellets": {
+        "name": "Genopfyld piller"
+      },
+      "clean_stove": {
+        "name": "Rens ovnen"
+      },
+      "toggle_mode": {
+        "name": "Skift funktionsmåde"
+      },
+      "resume_after_wood_mode": {
+        "name": "Fortsæt efter brændemode"
+      },
+      "force_auger": {
+        "name": "Kør sneglen"
+      }
+    }
+  },
+  "services": {
+    "start_stove": {
+      "name": "Start brændeovn",
+      "description": "Start brændeovnen i pillemode."
+    },
+    "stop_stove": {
+      "name": "Sluk brændeovn",
+      "description": "Stop pillemode."
+    },
+    "set_heatlevel": {
+      "name": "Indstil varmeniveau",
+      "description": "Skift varmeniveau (1-3). Skifter også ovnen til niveau-indstilling.",
+      "fields": {
+        "heatlevel": {
+          "name": "Varmeniveau",
+          "description": "Varmeniveau (1=lav, 2=mellem, 3=høj)."
+        }
+      }
+    },
+    "set_temperature": {
+      "name": "Indstil måltemperatur",
+      "description": "Indstil den ønskede rumtemperatur. Skifter også ovnen til temperaturmodus",
+      "fields": {
+        "temperature": {
+          "name": "Temperatur",
+          "description": "Måltemperatur i grader (celcius)."
+        }
+      }
+    },
+    "set_operation_mode": {
+      "name": "Skift funktionsmåde",
+      "description": "Skift ovnens funktionsmåde.",
+      "fields": {
+        "mode": {
+          "name": "Funktionsmåde",
+          "description": "Funktionsmåde: 0=Varmeniveau, 1=Måltemperatur, 2=Brænde"
+        }
+      }
+    },
+    "toggle_mode": {
+      "name": "Skift",
+      "description": "Skift mellem varmeniveau og måltempeatur."
+    },
+    "resume_after_wood_mode": {
+      "name": "Fortsæt efter brændemode",
+      "description": "Fortsæt automatisk efter brændemode, skifter til foregående indstilling."
+    },
+    "force_auger": {
+      "name": "Kør sneglen",
+      "description": "Kør sneglen (for test, piller der sidder fast, eller genopfyldning)."
+    },
+    "set_custom": {
+      "name": "Brugerdefinerede indstillinger",
+      "description": "Sæt brugerdefinerede indstillinger efter sti og værdi (avanceret).",
+      "fields": {
+        "path": {
+          "name": "Sti",
+          "description": "Parameterets sti (f.eks., 'auger.forced_run')."
+        },
+        "value": {
+          "name": "Værdi",
+          "description": "Værdien der skal indstilles (kan være en streng, et nummer, eller en boolesk værdi)."
+        }
+      }
+    }
+  }
+}

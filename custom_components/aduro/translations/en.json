@@ -269,13 +269,13 @@
         "name": "Low wood temp alert"
       },
       "carbon_monoxide": {
-      "name": "Kolmonoxidnivå"
+      "name": "Carbon monoxide level"
       },
       "carbon_monoxide_yellow": {
-        "name": "Kolmonoxidnivå gul"
+        "name": "Carbon monoxide level yellow"
       },
       "carbon_monoxide_red": {
-        "name": "Kolmonoxidnivå röd"
+        "name": "Carbon monoxide level red"
       }
     },
     "switch": {

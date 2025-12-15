@@ -112,7 +112,7 @@
         "name": "Understatus",
         "state": {
           "substate_waiting": "Vent",
-          "substate_ignition_1": "Optænding 1",
+          "substate_ignition_1": "Optænding",
           "substate_ignition_2": "Optænding 2",
           "substate_normal": "Normal",
           "substate_temp_reached": "Ønsket temperatur nået",

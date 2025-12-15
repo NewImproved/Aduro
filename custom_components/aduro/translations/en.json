@@ -90,10 +90,10 @@
   },
   "entity": {
     "sensor": {
-      "state_disp": {
+      "state": {
         "name": "State",
         "state": {
-          "state_operating": "Power {heatlevel}",
+          "state_operating": "Power {heatlevel_roman}",
           "state_stopped": "Stopped",
           "state_off": "Off",
           "state_operating_iii": "Power III",
@@ -112,7 +112,7 @@
         "name": "Substate",
         "state": {
           "substate_waiting": "Wait",
-          "substate_ignition_1": "Ignition 1",
+          "substate_ignition_1": "Ignition",
           "substate_ignition_2": "Ignition 2",
           "substate_normal": "Normal",
           "substate_temp_reached": "Room temperature reached",
@@ -123,7 +123,19 @@
           "substate_no_fuel": "No fuel",
           "substate_door_open": "Door open",
           "substate_heating_up": "Heating up",
-          "substate_check_burn_cup": "Check burn cup"
+          "substate_check_burn_cup": "Check burn cup",
+          "substate_dropshaft_hot": "Dropshaft hot"
+        },
+        "state_attributes": {
+          "timer_display": {
+            "name": "Timer Display"
+          },
+          "remaining_seconds": {
+            "name": "Remaining Seconds"
+          },
+          "remaining_minutes": {
+            "name": "Remaining Minutes"
+          }
         }
       },
       "consumption_since_cleaning": {
@@ -269,13 +281,13 @@
         "name": "Low wood temp alert"
       },
       "carbon_monoxide": {
-      "name": "Carbon monoxide level"
+      "name": "Kolmonoxidnivå"
       },
       "carbon_monoxide_yellow": {
-        "name": "Carbon monoxide level yellow"
+        "name": "Kolmonoxidnivå gul"
       },
       "carbon_monoxide_red": {
-        "name": "Carbon monoxide level red"
+        "name": "Kolmonoxidnivå röd"
       }
     },
     "switch": {

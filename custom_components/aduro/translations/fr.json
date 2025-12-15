@@ -112,7 +112,7 @@
         "name": "État secondaire",
         "state": {
           "substate_waiting": "Attente",
-          "substate_ignition_1": "Allumage 1",
+          "substate_ignition_1": "Allumage",
           "substate_ignition_2": "Allumage 2",
           "substate_normal": "Normal",
           "substate_temp_reached": "Température ambiante atteinte",
@@ -402,4 +402,5 @@
       }
     }
   }
+
 }

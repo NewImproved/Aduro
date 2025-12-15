@@ -50,7 +50,10 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 
 🌍 **Multi-Language Support**
 - English
-- Swedish (Svenska)
+- Danish
+- French
+- German
+- Swedish
 - Easy to add more languages
 
 ## Supported Models
@@ -172,7 +175,7 @@ To customize settings after setup:
 - **Pellets Remaining** - Remaining pellets (kg)
 - **Pellets Percentage** - Remaining pellets (%)
 - **Pellets Consumed** - Consumed since last refill (kg)
-- **Refill Counter** - Refills since cleaning
+- **Pellets Consumed Since Cleaning** - Consumed since cleaning (kg)
 
 #### Consumption
 - **Today's Consumption** - Current day (kg)
@@ -204,8 +207,8 @@ To customize settings after setup:
 ### Switches (3)
 
 - **Power** - Start/Stop the stove
-- **Auto Shutdown at Low Pellets** - Enable automatic shutdown
-- **Auto Resume After Wood Mode** - Enable automatic resume
+- **Auto Shutdown at Low Pellets** - Enable automatic shutdown at a certain pellets level and time
+- **Auto Resume After Wood Mode** - Enable automatic resume when in heat level mode
 
 ### Numbers (9)
 

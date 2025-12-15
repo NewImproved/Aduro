@@ -106,6 +106,9 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._pre_wood_mode_temperature: float | None = None
         self._pre_wood_mode_operation_mode: int | None = None
 
+        # Auto-resume tracking
+        self._auto_resume_sent = False  # Prevents multiple resume commands
+
         # Temperature alert tracking
         self._high_smoke_temp_threshold = 370.0  # °C
         self._high_smoke_duration_threshold = 30  # seconds
@@ -307,19 +310,12 @@ class AduroCoordinator(DataUpdateCoordinator):
         current_temperature_ref = data["operating"].get("boiler_ref")
         smoke_temp = data["operating"].get("smoke_temp", 0)
         
-        _LOGGER.debug(
-            "State change check - Previous HL: %s, Current HL: %s, Previous Mode: %s, Current Mode: %s, Change in progress: %s",
-            self._previous_heatlevel,
-            current_heatlevel,
-            self._previous_operation_mode,
-            current_operation_mode,
-            self._change_in_progress
-        )
+        # ... existing code ...
 
         # Track wood mode transitions
         is_in_wood_mode = current_state in ["9"]
         
-        # Entering wood mode - save current settings AND trigger auto-resume if enabled
+        # Entering wood mode - ONLY save settings, don't resume yet
         if is_in_wood_mode and not self._was_in_wood_mode:
             _LOGGER.info("Entering wood mode (state: %s), saving pellet mode settings", current_state)
             self._pre_wood_mode_operation_mode = current_operation_mode
@@ -327,19 +323,40 @@ class AduroCoordinator(DataUpdateCoordinator):
             self._pre_wood_mode_temperature = current_temperature_ref
             self._was_in_wood_mode = True
             
-            # Trigger auto-resume if mode is heat level and temperature under 110 (to give margin for 100 degrees).
-            if self._auto_resume_after_wood and current_operation_mode == 0 and smoke_temp <= 110:
-                _LOGGER.info("Auto-resume enabled, sending resume command to stove")
-                success = await self._async_resume_pellet_operation()
-                if success:
-                    data["auto_resume_commanded"] = True
-                else:
-                    _LOGGER.error("Failed to send auto-resume command")
+            # Log that we'll monitor for auto-resume
+            if self._auto_resume_after_wood and current_operation_mode == 0:
+                _LOGGER.info(
+                    "Auto-resume enabled (heat level mode) - will monitor smoke temp to resume when fire is dying (threshold: 110°C)"
+                )
         
-        # Exiting wood mode - just clear the flag
+        # WHILE in wood mode - check if we should auto-resume (fire is dying)
+        elif is_in_wood_mode and self._was_in_wood_mode:
+            # Only auto-resume in heat level mode (temperature mode does it automatically)
+            if (self._auto_resume_after_wood and 
+                self._pre_wood_mode_operation_mode == 0 and 
+                smoke_temp <= 120):
+                
+                # Check if we've already sent the resume command
+                if not data.get("auto_resume_commanded", False):
+                    _LOGGER.info(
+                        "Fire is dying (smoke temp: %.1f°C <= 120°C), sending auto-resume command",
+                        smoke_temp
+                    )
+                    success = await self._async_resume_pellet_operation()
+                    if success:
+                        data["auto_resume_commanded"] = True
+                        # Set a flag to prevent re-triggering
+                        self._auto_resume_sent = True
+                    else:
+                        _LOGGER.error("Failed to send auto-resume command")
+        
+        # Exiting wood mode - clear flags
         if not is_in_wood_mode and self._was_in_wood_mode:
             _LOGGER.info("Exiting wood mode, was in state: %s", self._previous_state)
             self._was_in_wood_mode = False
+            # Reset the auto-resume sent flag for next time
+            if hasattr(self, '_auto_resume_sent'):
+                self._auto_resume_sent = False
 
         # Initialize previous values on first run
         if self._previous_heatlevel is None:

@@ -125,16 +125,6 @@
           "substate_heating_up": "Värmer upp",
           "substate_check_burn_cup": "Kontrollera brännkoppen",
           "substate_dropshaft_hot": "Dropshaft varm"
-        },
-        "state_attributes": {
-          "timer_display": {
-            "name": "Timer Display"
-          },
-          "remaining_seconds": {
-            "name": "Återstående sekunder"
-          },
-          "remaining_minutes": {
-            "name": "Återstående minuter"
           }
         }
       },

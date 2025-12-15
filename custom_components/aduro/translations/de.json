@@ -112,7 +112,7 @@
         "name": "Unterzustand",
         "state": {
           "substate_waiting": "Warten",
-          "substate_ignition_1": "Zündung 1",
+          "substate_ignition_1": "Zündung",
           "substate_ignition_2": "Zündung 2",
           "substate_normal": "Normal",
           "substate_temp_reached": "Raumtemperatur erreicht",

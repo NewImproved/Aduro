@@ -90,20 +90,29 @@
   },
   "entity": {
     "sensor": {
-      "state_disp": {
+      "state": {
         "name": "Tillstånd",
         "state": {
-          "state_operating": "Drift {heatlevel}",
+          "state_operating": "Drift {heatlevel_roman}",
           "state_stopped": "Stoppad",
           "state_off": "Avstängd",
-          "state_operating_iii": "Drift III"
+          "state_operating_iii": "Drift III",
+          "state_stopped_draft": "Dropshaft varm",
+          "state_stopped_smoke_sensor": "Röksensor felaktig",
+          "state_stopped_dropshaft":  "Dropshaft-sensor felaktig",
+          "state_stopped_burner_yellow": "kolla brännare gul",
+          "state_stopped_auger": "pelletsmatare felaktig",
+          "state_stopped_timer": "Stoppad av timer",
+          "state_operating_air_damper": "Luftspjäll stängt",
+          "state_stopped_co_sensor": "Co-sensor felaktig",
+          "state_stopped_no_fan": "Ingen strömförbrukning fläkt"
         }
       },
       "substate": {
         "name": "Undertillstånd",
         "state": {
           "substate_waiting": "Väntar",
-          "substate_ignition_1": "Upptändning 1",
+          "substate_ignition_1": "Upptändning",
           "substate_ignition_2": "Upptändning 2",
           "substate_normal": "Normal",
           "substate_temp_reached": "Rumstemperatur nådd",
@@ -114,7 +123,19 @@
           "substate_no_fuel": "Inget bränsle",
           "substate_door_open": "Lucka öppen",
           "substate_heating_up": "Värmer upp",
-          "substate_check_burn_cup": "Kontrollera brännkoppen"
+          "substate_check_burn_cup": "Kontrollera brännkoppen",
+          "substate_dropshaft_hot": "Dropshaft varm"
+        },
+        "state_attributes": {
+          "timer_display": {
+            "name": "Timer Display"
+          },
+          "remaining_seconds": {
+            "name": "Återstående sekunder"
+          },
+          "remaining_minutes": {
+            "name": "Återstående minuter"
+          }
         }
       },
       "consumption_since_cleaning": {

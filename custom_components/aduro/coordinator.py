@@ -150,6 +150,20 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Load saved pellet data (including switch states)
         await coordinator.async_load_pellet_data()
         
+        # Pre-populate coordinator.data with loaded settings so switches can read them immediately
+        coordinator.data = {
+            "pellets": {
+                "capacity": coordinator._pellet_capacity,
+                "consumed": coordinator._pellets_consumed,
+                "consumed_total": coordinator._pellets_consumed_total,
+                "amount": max(0, coordinator._pellet_capacity - coordinator._pellets_consumed),
+                "percentage": ((max(0, coordinator._pellet_capacity - coordinator._pellets_consumed) / coordinator._pellet_capacity * 100) if coordinator._pellet_capacity > 0 else 0),
+                "notification_level": coordinator._notification_level,
+                "shutdown_level": coordinator._shutdown_level,
+                "auto_shutdown_enabled": coordinator._auto_shutdown_enabled,
+            }
+        }
+        
         # Initial data fetch
         await coordinator.async_config_entry_first_refresh()
         
@@ -239,8 +253,8 @@ class AduroCoordinator(DataUpdateCoordinator):
 
             if not hasattr(self, '_last_pellet_save'):
                 self._last_pellet_save = datetime.now()
-        
-            if (datetime.now() - self._last_pellet_save) > timedelta(hours=1):
+
+            if (datetime.now() - self._last_pellet_save) > timedelta(minutes=15):
                 asyncio.create_task(self.async_save_pellet_data())
                 self._last_pellet_save = datetime.now()
                 _LOGGER.debug("Periodic pellet data save triggered")
@@ -1309,9 +1323,18 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._consumption_snapshots = data.get("consumption_snapshots", {})
                 self._snapshots_initialized = data.get("snapshots_initialized", False)
                 
-                # Load user preferences
+                # Load user preferences (switches)
                 self._auto_resume_after_wood = data.get("auto_resume_after_wood", False)
                 self._auto_shutdown_enabled = data.get("auto_shutdown_enabled", False)
+                
+                # Load user settings (numbers)
+                self._pellet_capacity = data.get("pellet_capacity", 9.5)
+                self._notification_level = data.get("notification_level", 10)
+                self._shutdown_level = data.get("shutdown_level", 5)
+                self._high_smoke_temp_threshold = data.get("high_smoke_temp_threshold", 370.0)
+                self._high_smoke_duration_threshold = data.get("high_smoke_duration_threshold", 30)
+                self._low_wood_temp_threshold = data.get("low_wood_temp_threshold", 175.0)
+                self._low_wood_duration_threshold = data.get("low_wood_duration_threshold", 300)
                 
                 # Convert last_consumption_day string back to date object
                 last_day_str = data.get("last_consumption_day")
@@ -1321,11 +1344,15 @@ class AduroCoordinator(DataUpdateCoordinator):
                 
                 _LOGGER.info(
                     "Loaded pellet data from storage - consumed: %.2f kg, total consumed: %.2f kg, "
-                    "auto_resume: %s, auto_shutdown: %s",
+                    "auto_resume: %s, auto_shutdown: %s, capacity: %.1f kg, "
+                    "notification_level: %.0f%%, shutdown_level: %.0f%%",
                     self._pellets_consumed,
                     self._pellets_consumed_total,
                     self._auto_resume_after_wood,
-                    self._auto_shutdown_enabled
+                    self._auto_shutdown_enabled,
+                    self._pellet_capacity,
+                    self._notification_level,
+                    self._shutdown_level
                 )
             else:
                 _LOGGER.debug("No stored pellet data found, starting fresh")
@@ -1341,9 +1368,17 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "consumption_snapshots": self._consumption_snapshots,
                 "snapshots_initialized": getattr(self, '_snapshots_initialized', False),
                 "last_consumption_day": self._last_consumption_day.isoformat() if self._last_consumption_day else None,
-                # Save user preferences
+                # Save user preferences (switches)
                 "auto_resume_after_wood": self._auto_resume_after_wood,
                 "auto_shutdown_enabled": self._auto_shutdown_enabled,
+                # Save user settings (numbers)
+                "pellet_capacity": self._pellet_capacity,
+                "notification_level": self._notification_level,
+                "shutdown_level": self._shutdown_level,
+                "high_smoke_temp_threshold": self._high_smoke_temp_threshold,
+                "high_smoke_duration_threshold": self._high_smoke_duration_threshold,
+                "low_wood_temp_threshold": self._low_wood_temp_threshold,
+                "low_wood_duration_threshold": self._low_wood_duration_threshold,
             }
             await self._store.async_save(data)
             _LOGGER.debug("Saved pellet data to storage")
@@ -1400,16 +1435,19 @@ class AduroCoordinator(DataUpdateCoordinator):
         """Set pellet capacity."""
         self._pellet_capacity = capacity
         _LOGGER.info("Pellet capacity set to: %s kg", capacity)
+        asyncio.create_task(self.async_save_pellet_data())
 
     def set_notification_level(self, level: float) -> None:
         """Set notification level (percentage)."""
         self._notification_level = level
         _LOGGER.info("Notification level set to: %s%%", level)
+        asyncio.create_task(self.async_save_pellet_data())
 
     def set_shutdown_level(self, level: float) -> None:
         """Set auto-shutdown level (percentage)."""
         self._shutdown_level = level
         _LOGGER.info("Shutdown level set to: %s%%", level)
+        asyncio.create_task(self.async_save_pellet_data())
 
     def set_auto_shutdown_enabled(self, enabled: bool) -> None:
         """Enable or disable automatic shutdown at low pellet level."""
@@ -1437,21 +1475,25 @@ class AduroCoordinator(DataUpdateCoordinator):
         """Set high smoke temperature threshold."""
         self._high_smoke_temp_threshold = temperature
         _LOGGER.info("High smoke temp threshold set to: %s°C", temperature)
+        asyncio.create_task(self.async_save_pellet_data())
 
     def set_high_smoke_duration_threshold(self, duration: int) -> None:
         """Set high smoke temperature duration threshold."""
         self._high_smoke_duration_threshold = duration
         _LOGGER.info("High smoke duration threshold set to: %s seconds", duration)
+        asyncio.create_task(self.async_save_pellet_data())
 
     def set_low_wood_temp_threshold(self, temperature: float) -> None:
         """Set low wood mode temperature threshold."""
         self._low_wood_temp_threshold = temperature
         _LOGGER.info("Low wood temp threshold set to: %s°C", temperature)
+        asyncio.create_task(self.async_save_pellet_data())
 
     def set_low_wood_duration_threshold(self, duration: int) -> None:
         """Set low wood mode temperature duration threshold."""
         self._low_wood_duration_threshold = duration
         _LOGGER.info("Low wood duration threshold set to: %s seconds", duration)
+        asyncio.create_task(self.async_save_pellet_data())
 
     def update_pellet_consumption(self, amount: float) -> None:
         """Update pellet consumption manually."""

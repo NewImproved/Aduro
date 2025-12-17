@@ -329,7 +329,7 @@
       "toggle_mode": {
         "name": "Changer de mode"
       },
-      "resume_after_wood": {
+      "resume_after_wood_mode": {
         "name": "Reprendre après le mode bois"
       },
       "force_auger": {
@@ -404,3 +404,4 @@
     }
   }
 }
+

@@ -123,7 +123,7 @@
           "substate_no_fuel": "Pas de combustible",
           "substate_door_open": "Porte ouverte",
           "substate_heating_up": "En chauffe",
-          "substate_check_burn_cup": "Vérifiez le creuset de combustion"
+          "substate_check_burn_cup": "Vérifiez le creuset de combustion",
           "substate_dropshaft_hot": "Conduit d'alimentation chaud"          
         }
       },

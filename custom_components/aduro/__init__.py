@@ -68,42 +68,11 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def _load_options(coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
     """Load options and apply to coordinator."""
-    options = entry.options
+    # NOTE: All user settings (numbers and switches) are loaded from pellet data storage
+    # in async_load_pellet_data() to persist across restarts. This function is kept
+    # for future options that may need to be loaded from entry.options.
     
-    # Pellet settings
-    pellet_capacity = options.get("pellet_capacity", DEFAULT_CAPACITY_PELLETS)
-    notification_level = options.get("notification_level", DEFAULT_NOTIFICATION_LEVEL)
-    shutdown_level = options.get("shutdown_level", DEFAULT_SHUTDOWN_LEVEL)
-    auto_shutdown = options.get("auto_shutdown_enabled", False)
-    
-    coordinator.set_pellet_capacity(pellet_capacity)
-    coordinator.set_notification_level(notification_level)
-    coordinator.set_shutdown_level(shutdown_level)
-    coordinator.set_auto_shutdown_enabled(auto_shutdown)
-    
-    # Temperature alert settings
-    high_smoke_temp = options.get("high_smoke_temp_threshold", DEFAULT_HIGH_SMOKE_TEMP)
-    high_smoke_duration = options.get("high_smoke_duration_threshold", DEFAULT_HIGH_SMOKE_DURATION)
-    low_wood_temp = options.get("low_wood_temp_threshold", DEFAULT_LOW_WOOD_TEMP)
-    low_wood_duration = options.get("low_wood_duration_threshold", DEFAULT_LOW_WOOD_DURATION)
-    
-    coordinator.set_high_smoke_temp_threshold(high_smoke_temp)
-    coordinator.set_high_smoke_duration_threshold(high_smoke_duration)
-    coordinator.set_low_wood_temp_threshold(low_wood_temp)
-    coordinator.set_low_wood_duration_threshold(low_wood_duration)
-    
-    # Advanced settings
-    auto_resume_wood = options.get("auto_resume_after_wood", False)
-    coordinator.set_auto_resume_after_wood(auto_resume_wood)
-    
-    _LOGGER.info(
-        "Loaded options - Pellet: %.1fkg, Alerts: High Smoke=%.0f°C/%ds, Low Wood=%.0f°C/%ds",
-        pellet_capacity,
-        high_smoke_temp,
-        high_smoke_duration,
-        low_wood_temp,
-        low_wood_duration,
-    )
+    _LOGGER.info("User settings loaded from pellet data storage")
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""

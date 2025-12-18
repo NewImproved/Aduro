@@ -7,7 +7,7 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 
 
 **Known bugs:**
-- `year_over_year` sensor is currently unavailable, this will be looked at more next year. 
+- `year_over_year` sensor is currently unavailable, this will be looked into next year. 
 
 ## Features
 

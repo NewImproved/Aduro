@@ -133,7 +133,7 @@ The integration will automatically:
 
 ## Entities
 
-### Sensors (42)
+### Sensors (38)
 
 #### Status & Operation
 - **State** - Main status (Operating II, Stopped, etc.)

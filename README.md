@@ -25,12 +25,11 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 🌡️ **Temperature Monitoring & Alerts**
 - High smoke temperature alert (300-450°C, configurable)
 - Low wood mode temperature alert (20-200°C, configurable)
-- Customizable duration of time before alert (1-30 minutes)
+- Customizable duration of time before alert (10 seconds-30 minutes)
 - Real-time temperature monitoring with hysteresis
-- Prevent dangerous overheating for all modes and fire extinction during wood mode
 
 📊 **Comprehensive Monitoring**
-- 42+ sensors (temperatures, power, pellets, consumption, alerts)
+- ~55 entities + attributes (temperatures, power, pellets, consumption, alerts)
 - Real-time state and status tracking
 - Operating time statistics
 - Network information (WiFi signal, IP address)
@@ -40,7 +39,7 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 - Consumption monitoring (daily, monthly, yearly, total)
 - Low pellet notifications
 - Automatic shutdown at critical level
-- Refill counter and cleaning tracker
+- Pellets consumption since last cleaning counter
 
 ⏱️ **Smart Features**
 - Ignition timer countdowns
@@ -57,13 +56,11 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 - Easy to add more languages
 
 ## Supported Models
-Only Aduro H1, H2 & H5 have been tested.
+Only Aduro H1, H2 & H5 have been confirmed to work with the integration.
 
-Asumptions have been made for how the following stoves work, and are not yet confirmed.
+Asumptions have been made for Aduro H3, H4 and H6. They are not yet confirmed.
 If you can confirm that the integration work for a stove, please let me know via [GitHub Issues](https://github.com/NewImproved/Aduro/issues).
-- Aduro H3
-- Aduro H4
-- Aduro H6
+
 
 ## Prerequisites
 
@@ -103,6 +100,7 @@ If you can confirm that the integration work for a stove, please let me know via
    - **Serial Number**: Your stove's serial number
    - **PIN Code**: Your stove's PIN code
    - **Stove Model**: Select your model (H1-H6)
+   - **IP-address**: Set fixed IP-address (optional)
 
 The integration will automatically:
 - Discover your stove on the network
@@ -111,40 +109,35 @@ The integration will automatically:
 
 ### Optional Configuration
 
-To customize settings after setup:
-1. Go to **Settings** → **Devices & Services**
-2. Find **Aduro Hybrid Stove**
-3. Click **"CONFIGURE"**
-4. Choose from three configuration areas:
-
 #### Pellet Settings
 - Pellet container capacity (kg)
 - Low pellet notification level (%)
 - Auto-shutdown level (%)
 - Enable/disable automatic shutdown
 
-#### Temperature Alerts ⭐ NEW
+#### Temperature Alerts
 - **High Smoke Temperature Alert**
   - Threshold: 300-450°C (default: 370°C)
-  - Duration threshold: 1-30 minutes (default: 30 seconds)
+  - Duration threshold: 10 seconds -30 minutes (default: 30 seconds)
   - Alerts when smoke temperature is dangerously high
 - **Low Wood Mode Temperature Alert**
   - Threshold: 20-200°C (default: 175°C)
-  - Duration threshold: 1-30 minutes (default: 5 minutes)
+  - Duration threshold: 10 seconds -30 minutes (default: 5 minutes)
   - Alerts when wood fire might be going out
 
 #### Advanced Settings
 - Auto-resume after wood mode
+
+#### Configuration settings
+- Configurations are saved on file to survive restarts and upgrades.
 
 ## Entities
 
 ### Sensors (42)
 
 #### Status & Operation
-- **Status** - Main status (Operating II, Stopped, etc.)
-- **Status Detail** - Detailed status (with timers for i.e. start up)
-- **State** - Raw state number
-- **Substate** - Raw substate number
+- **State** - Main status (Operating II, Stopped, etc.)
+- **Substate** - Detailed status (with timers for i.e. start up)
 - **Heat Level** - Current heat level (1-3)
 - **Heat Level Display** - Roman numerals (I, II, III)
 - **Operation Mode** - Current mode (0=Heat Level, 1=Temperature, 2=Wood)
@@ -184,6 +177,11 @@ To customize settings after setup:
 - **This Year's Consumption** - Current year (kg)
 - **Total Consumption** - Lifetime consumption (kg)
 
+#### Carbon Monoxide
+- **Carbon Monozide Level** - Current Carbon monoxide level (ppm)
+- **Carbon Monozide Level Yellow** - Yellow Carbon monoxide level threshold (ppm)
+- **Carbon Monozide Red** - Red Carbon monoxide level threshold (ppm)
+- 
 #### Network
 - **Stove IP Address** - Current IP
 - **WiFi Network** - Connected SSID
@@ -223,9 +221,9 @@ To customize settings after setup:
 
 #### Temperature Alert Configuration
 - **High Smoke Temp Alert Threshold** - Alert threshold (300-450°C)
-- **High Smoke Temp Alert Duration threshold** - Alert duration threshold (60-1800 seconds)
+- **High Smoke Temp Alert Duration threshold** - Alert duration threshold (10-1800 seconds)
 - **Low Wood Temp Alert Threshold** - Alert threshold (20-200°C)
-- **Low Wood Temp Alert Duration threshold** - Alert duration threshold (60-1800 seconds)
+- **Low Wood Temp Alert Duration threshold** - Alert duration threshold (10-1800 seconds)
 
 ### Buttons (5)
 
@@ -419,7 +417,7 @@ automation:
 ### Commands Not Working
 
 - Check Home Assistant logs for errors
-- Ensure stove is not in wood mode (state 9 or 14)
+- Ensure stove is not in wood mode (state 9)
 - Try restarting the integration
 
 ### Temperature Alerts Not Triggering
@@ -448,36 +446,16 @@ logger:
     custom_components.aduro: debug
 ```
 
-## Migration from YAML/Python Scripts
-
-If you're migrating from the manual YAML configuration:
-
-1. **Backup** your current configuration
-2. **Remove** old automations and files using `python_script.exec`
-3. **Remove** old template sensors
-4. **Install** this integration
-5. **Configure** via UI
-6. **Update** automations to use new service calls
-7. **Test** all functionality
-
-The integration preserves all functionality:
-- ✅ Mode change tracking with retries
-- ✅ External change detection
-- ✅ Pellet tracking and notifications
-- ✅ Timer countdowns
-- ✅ Auto start/stop detection
-- ✅ Wood mode support
-- ✅ Temperature monitoring and alerts
-
 ## Contributing
 
 Contributions are welcome! Please:
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+1. Create an issue and discuss the wanted functionallity with integration owner.
+2. Fork the repository
+3. Create a feature branch
+4. Make your changes
+5. Test thoroughly
+6. Submit a pull request
 
 ### Adding Translations
 
@@ -502,8 +480,6 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 
 ## Development plans/wish list
 
-- For beta-releases: test that all functions are working as intended.
-- Update integration with all relevant translations between state/substates-numbers and their related text string.
 - Get confirmation/information about the remaining Aduro hybrid stoves.
 - Estimation of pellets consumption over time, depending on temperature settings, heat level settings, outside temperature and other relevant factors to estimate a time for when the stove have consumed all pellets.
 - External and wireless temperature sensor is available as an accessory. Could it be possible to use other temperature sensors and send the information to the stove via Home Assistant?
@@ -561,7 +537,6 @@ This is an unofficial integration and is not affiliated with or endorsed by Adur
 - 🐛 [Report bugs](https://github.com/NewImproved/Aduro/issues)
 - 💡 [Request features](https://github.com/NewImproved/Aduro/issues)
 - 📖 [Documentation](https://github.com/NewImproved/Aduro)
-- 💬 [Discussions](https://github.com/NewImproved/Aduro/discussions)
 
 ---
 

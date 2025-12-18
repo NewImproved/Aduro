@@ -2,58 +2,62 @@
 [![GitHub release](https://img.shields.io/github/release/NewImproved/Aduro.svg)](https://github.com/NewImproved/Aduro/releases)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=W6WPMAQ3YKK6G)
 
-# BETA-RELEASE UNDER CONSTRUCTION!!!
-All functions are not yet tested.
-
 # Aduro Hybrid Stove Integration for Home Assistant
 A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 and H6 unconfirmed] hybrid pellet stoves.
 
+
+**Known bugs:**
+- `year_over_year` sensor is currently unavailable, this will be looked at more next year. 
+
 ## Features
 
-✨ **Complete Control**
+**Complete Control**
 - Start/Stop stove remotely
 - Adjust heat level (1-3)
 - Set target temperature (5-35°C)
 - Toggle between operation modes
 
-🔥 **Smart Operation**
+**Smart Operation**
 - Automatic retry on command failures
 - Fast polling during mode changes
 - External change detection (sync with mobile app)
 - Wood mode support with automatic resume
 
-🌡️ **Temperature Monitoring & Alerts**
+**Temperature Monitoring & Alerts**
 - High smoke temperature alert (300-450°C, configurable)
 - Low wood mode temperature alert (20-200°C, configurable)
 - Customizable duration of time before alert (10 seconds-30 minutes)
 - Real-time temperature monitoring with hysteresis
 
-📊 **Comprehensive Monitoring**
+**Comprehensive Monitoring**
 - ~55 entities + attributes (temperatures, power, pellets, consumption, alerts)
 - Real-time state and status tracking
 - Operating time statistics
 - Network information (WiFi signal, IP address)
 
-🌲 **Pellet Management**
+**Pellet Management**
 - Pellet level tracking (amount and percentage)
 - Consumption monitoring (daily, monthly, yearly, total)
 - Low pellet notifications
 - Automatic shutdown at critical level
 - Pellets consumption since last cleaning counter
 
-⏱️ **Smart Features**
+**Smart Features**
 - Ignition timer countdowns
 - Mode transition tracking
 - Change-in-progress detection
 - Automatic state synchronization
 
-🌍 **Multi-Language Support**
+**Multi-Language Support**
 - English
 - Danish
 - French
 - German
 - Swedish
 - Easy to add more languages
+
+**Persisting Settings and tracking**
+- Configurations, user settings and some sensors are saved on file to survive restarts and upgrades.
 
 ## Supported Models
 Only Aduro H1, H2 & H5 have been confirmed to work with the integration.
@@ -127,9 +131,6 @@ The integration will automatically:
 
 #### Advanced Settings
 - Auto-resume after wood mode
-
-#### Configuration settings
-- Configurations are saved on file to survive restarts and upgrades.
 
 ## Entities
 
@@ -534,10 +535,10 @@ This is an unofficial integration and is not affiliated with or endorsed by Adur
 
 ## Support
 
-- 🐛 [Report bugs](https://github.com/NewImproved/Aduro/issues)
-- 💡 [Request features](https://github.com/NewImproved/Aduro/issues)
-- 📖 [Documentation](https://github.com/NewImproved/Aduro)
+- [Report bugs](https://github.com/NewImproved/Aduro/issues)
+- [Request features](https://github.com/NewImproved/Aduro/issues)
+- [Documentation](https://github.com/NewImproved/Aduro)
 
 ---
 
-**Enjoy your smart Aduro stove! 🔥**
+**Enjoy your smart Aduro stove!**

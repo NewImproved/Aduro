@@ -21,7 +21,7 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 - Automatic retry on command failures
 - Fast polling during mode changes
 - External change detection (sync with mobile app)
-- Wood mode support with automatic resume
+- Wood mode support with automatic resume for when the stove is in heat level mode.
 
 **Temperature Monitoring & Alerts**
 - High smoke temperature alert (300-450°C, configurable)
@@ -130,7 +130,7 @@ The integration will automatically:
   - Alerts when wood fire might be going out
 
 #### Advanced Settings
-- Auto-resume after wood mode
+- Auto-resume after wood mode (for when the stove is in heat level mode)
 
 ## Entities
 
@@ -207,7 +207,7 @@ The integration will automatically:
 
 - **Power** - Start/Stop the stove
 - **Auto Shutdown at Low Pellets** - Enable automatic shutdown at a certain pellets level and time
-- **Auto Resume After Wood Mode** - Enable automatic resume when in heat level mode
+- **Auto Resume After Wood Mode** - Enable automatic resume when in heat level mode. Activates when the smoke temperature drops below 120°C.
 
 ### Numbers (9)
 

@@ -179,9 +179,9 @@ The integration will automatically:
 - **Total Consumption** - Lifetime consumption (kg)
 
 #### Carbon Monoxide
-- **Carbon Monozide Level** - Current Carbon monoxide level (ppm)
-- **Carbon Monozide Level Yellow** - Yellow Carbon monoxide level threshold (ppm)
-- **Carbon Monozide Red** - Red Carbon monoxide level threshold (ppm)
+- **Carbon Monoxide Level** - Current Carbon monoxide level (ppm)
+- **Carbon Monoxide Level Yellow** - Yellow Carbon monoxide level threshold (ppm)
+- **Carbon Monoxide Level Red** - Red Carbon monoxide level threshold (ppm)
 - 
 #### Network
 - **Stove IP Address** - Current IP

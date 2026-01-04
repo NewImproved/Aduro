@@ -981,9 +981,71 @@ class AduroYearOverYearSensor(AduroSensorBase):
             return False
         if not self.coordinator.data or "consumption" not in self.coordinator.data:
             return False
-        # Only available if we have year-over-year data
+        # Always available if we have consumption data
+        return True
+
+    def _get_comparison_data(self) -> dict[str, Any] | None:
+        """Calculate year-over-year comparison with same-period logic."""
+        from datetime import date
+        
         consumption = self.coordinator.data["consumption"]
-        return "year_over_year" in consumption
+        snapshots = consumption.get("monthly_snapshots", {})
+        
+        today = date.today()
+        current_year = today.year
+        current_month = today.month
+        current_day = today.day
+        
+        month_names = [
+            "january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december"
+        ]
+        current_month_name = month_names[current_month - 1]
+        
+        # Get current month's consumption (month-to-date)
+        current_snapshot_key = f"{current_year}_{current_month_name}"
+        current_month_value = snapshots.get(current_snapshot_key, 0)
+        
+        # Look for last year's same month COMPLETE data
+        last_year = current_year - 1
+        last_year_snapshot_key = f"{last_year}_{current_month_name}"
+        last_year_complete_month = snapshots.get(last_year_snapshot_key)
+        
+        if last_year_complete_month is not None and last_year_complete_month > 0:
+            # We have complete data from last year's same month
+            # Calculate what last year would have been at the same day of month
+            
+            # Get number of days in last year's month
+            import calendar
+            days_in_last_year_month = calendar.monthrange(last_year, current_month)[1]
+            
+            # Calculate daily average from last year's complete month
+            daily_avg_last_year = last_year_complete_month / days_in_last_year_month
+            
+            # Estimate what last year was at the same day
+            last_year_same_period = daily_avg_last_year * current_day
+            
+            # Calculate difference and percentage
+            difference = current_month_value - last_year_same_period
+            
+            if last_year_same_period > 0:
+                percentage_change = (difference / last_year_same_period) * 100
+            else:
+                percentage_change = 100.0 if current_month_value > 0 else 0.0
+            
+            return {
+                "current_month": current_month_name,
+                "current_year_value": round(current_month_value, 2),
+                "last_year_same_period": round(last_year_same_period, 2),
+                "last_year_complete_month": round(last_year_complete_month, 2),
+                "difference": round(difference, 2),
+                "percentage_change": round(percentage_change, 1),
+                "comparison_day": current_day,
+                "comparison_type": "same_period",
+            }
+        
+        # No historical data available for this month
+        return None
 
     @property
     def native_value(self) -> str | None:
@@ -991,14 +1053,14 @@ class AduroYearOverYearSensor(AduroSensorBase):
         if not self.coordinator.data or "consumption" not in self.coordinator.data:
             return None
         
-        consumption = self.coordinator.data["consumption"]
-        yoy = consumption.get("year_over_year", {})
+        comparison = self._get_comparison_data()
         
-        if not yoy:
-            return None
+        if comparison:
+            percentage = comparison.get("percentage_change", 0)
+            return f"{percentage:+.1f}%"
         
-        percentage = yoy.get("percentage_change", 0)
-        return f"{percentage:+.1f}%"
+        # No historical data
+        return "No data"
 
     @property
     def icon(self) -> str:
@@ -1006,15 +1068,19 @@ class AduroYearOverYearSensor(AduroSensorBase):
         if not self.coordinator.data or "consumption" not in self.coordinator.data:
             return "mdi:chart-line"
         
-        consumption = self.coordinator.data["consumption"]
-        yoy = consumption.get("year_over_year", {})
-        percentage = yoy.get("percentage_change", 0)
+        comparison = self._get_comparison_data()
         
-        if percentage > 10:
-            return "mdi:trending-up"
-        elif percentage < -10:
-            return "mdi:trending-down"
-        return "mdi:trending-neutral"
+        if comparison:
+            percentage = comparison.get("percentage_change", 0)
+            
+            if percentage > 10:
+                return "mdi:trending-up"
+            elif percentage < -10:
+                return "mdi:trending-down"
+            return "mdi:trending-neutral"
+        
+        # No historical data
+        return "mdi:chart-line"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -1023,17 +1089,30 @@ class AduroYearOverYearSensor(AduroSensorBase):
             return {}
         
         consumption = self.coordinator.data["consumption"]
-        yoy = consumption.get("year_over_year", {})
+        comparison = self._get_comparison_data()
         
-        if not yoy:
-            return {}
+        if comparison:
+            # Include snapshots for reference
+            snapshots = consumption.get("monthly_snapshots", {})
+            attrs = dict(comparison)
+            attrs["all_snapshots"] = snapshots
+            return attrs
         
-        # Also include all historical snapshots for reference
-        snapshots = consumption.get("monthly_snapshots", {})
-        attrs = dict(yoy)
-        attrs["all_snapshots"] = snapshots
+        # No historical data available
+        from datetime import date
+        month_names = [
+            "january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december"
+        ]
+        current_month_name = month_names[date.today().month - 1]
+        current_year = date.today().year
+        last_year = current_year - 1
         
-        return attrs
+        return {
+            "current_month": current_month_name,
+            "note": f"No data available for {current_month_name} {last_year}",
+            "all_snapshots": consumption.get("monthly_snapshots", {}),
+        }
 
 # =============================================================================
 # Network Sensors

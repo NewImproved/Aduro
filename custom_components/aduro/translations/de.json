@@ -94,6 +94,7 @@
         "name": "Zustand",
         "state": {
           "state_operating": "Leistung {heatlevel}",
+          "state_operating_startup": "Leistung",
           "state_stopped": "Gestoppt",
           "state_off": "Aus",
           "state_operating_iii": "Leistung III",

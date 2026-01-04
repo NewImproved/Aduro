@@ -94,6 +94,7 @@
         "name": "Status",
         "state": {
           "state_operating": "Drift {heatlevel}",
+          "state_operating_startup": "Drift",
           "state_stopped": "Stoppet",
           "state_off": "Slukket",
           "state_operating_iii": "Drift III",

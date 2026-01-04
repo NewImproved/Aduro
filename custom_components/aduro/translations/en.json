@@ -94,6 +94,7 @@
         "name": "State",
         "state": {
           "state_operating": "Power {heatlevel_roman}",
+          "state_operating_startup": "Power",
           "state_stopped": "Stopped",
           "state_off": "Off",
           "state_operating_iii": "Power III",

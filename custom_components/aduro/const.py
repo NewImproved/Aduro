@@ -115,8 +115,8 @@ SHUTDOWN_LEVEL_STEP: Final = 1
 # These keys are used for translation lookups
 STATE_NAMES: Final = {
     "0": "state_operating",
-    "2": "state_operating",
-    "4": "state_operating",
+    "2": "state_operating_startup",
+    "4": "state_operating_startup",
     "5": "state_operating",
     "6": "state_stopped",
     "9": "state_stopped",
@@ -158,6 +158,7 @@ SUBSTATE_NAMES: Final = {
 # Display versions (for when translations aren't available)
 STATE_NAMES_DISPLAY: Final = {
     "state_operating": "Power {heatlevel}",
+    "state_operating_startup": "Power",
     "state_stopped": "Stopped",
     "state_off": "Off",
     "state_operating_iii": "Power III",

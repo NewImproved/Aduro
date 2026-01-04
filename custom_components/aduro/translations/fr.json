@@ -94,6 +94,7 @@
         "name": "État",
         "state": {
           "state_operating": "Puissance {heatlevel_roman}",
+          "state_operating_startup": "Puissance",
           "state_stopped": "Arrêté",
           "state_off": "Éteint",
           "state_operating_iii": "Puissance III",

@@ -94,6 +94,7 @@
         "name": "Tillstånd",
         "state": {
           "state_operating": "Drift {heatlevel_roman}",
+          "state_operating_startup": "Drift",
           "state_stopped": "Stoppad",
           "state_off": "Avstängd",
           "state_operating_iii": "Drift III",

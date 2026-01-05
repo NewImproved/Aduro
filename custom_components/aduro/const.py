@@ -200,6 +200,7 @@ STOVE_STATES_OFF: Final = SHUTDOWN_STATES
 # Timer durations (in seconds)
 TIMER_STARTUP_1: Final = 870  # 14:30 minutes
 TIMER_STARTUP_2: Final = 870  # 14:30 minutes
+TIMER_SHUTDOWN: Final = 120  # 2:00 minutes
 
 # Sensor attributes
 ATTR_HEATLEVEL: Final = "heatlevel"

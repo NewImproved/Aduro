@@ -34,6 +34,7 @@ from .const import (
     HEAT_LEVEL_POWER_MAP,
     TIMER_STARTUP_1,
     TIMER_STARTUP_2,
+    TIMER_SHUTDOWN,
     TIMEOUT_MODE_TRANSITION,
     TIMEOUT_CHANGE_IN_PROGRESS,
     TIMEOUT_COMMAND_RESPONSE,
@@ -125,6 +126,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Timer tracking
         self._timer_startup_1_started: datetime | None = None
         self._timer_startup_2_started: datetime | None = None
+        self._timer_shutdown_started: datetime | None = None
         
         # Previous values for change detection
         self._previous_heatlevel: int | None = None
@@ -333,6 +335,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             return
         
         current_state = data["operating"].get("state")
+        current_substate = data["operating"].get("substate")
         current_heatlevel = data["operating"].get("heatlevel")
         current_operation_mode = data["status"].get("operation_mode")
         current_temperature_ref = data["operating"].get("boiler_ref")
@@ -389,6 +392,24 @@ class AduroCoordinator(DataUpdateCoordinator):
             _LOGGER.info("Exiting wood mode, was in state: %s", self._previous_state)
             self._was_in_wood_mode = False
             self._auto_resume_sent = False  # Reset for next wood mode session
+
+        # Start timers based on state
+        if current_state == "2" and self._previous_state != "2":
+            self._timer_startup_1_started = datetime.now()
+            _LOGGER.debug("Started startup timer 1")
+        
+        if current_state == "4" and self._previous_state != "4":
+            self._timer_startup_2_started = datetime.now()
+            _LOGGER.debug("Started startup timer 2")
+
+        if (current_state == "14" and current_substate == "0" and 
+            self._previous_state != "14"):
+            self._timer_shutdown_started = datetime.now()
+            _LOGGER.debug("Started shutdown timer")
+        
+        if current_state != "14" and self._timer_shutdown_started is not None:
+            self._timer_shutdown_started = None
+            _LOGGER.debug("Cleared shutdown timer - state changed away from 14")
 
         # Initialize previous values on first run
         if self._previous_heatlevel is None:
@@ -447,7 +468,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Detect external changes (from app)
         app_change_detected = False
         
-        # FIXED: Only check for external changes when NOT in progress
+        # Only check for external changes when NOT in progress
         if not self._change_in_progress:
             # Always check for changes and update targets, but only flag as "app_change" when not in progress
             if current_operation_mode == 0:  # Heatlevel mode
@@ -489,15 +510,6 @@ class AduroCoordinator(DataUpdateCoordinator):
             self._previous_state not in STARTUP_STATES):
             _LOGGER.info("Stove started, state: %s", current_state)
             data["auto_start_detected"] = True
-        
-        # Start timers based on state
-        if current_state == "2" and self._previous_state != "2":
-            self._timer_startup_1_started = datetime.now()
-            _LOGGER.debug("Started startup timer 1")
-        
-        if current_state == "4" and self._previous_state != "4":
-            self._timer_startup_2_started = datetime.now()
-            _LOGGER.debug("Started startup timer 2")
 
         # Update targets to match current values when external change detected
         if app_change_detected:
@@ -677,6 +689,22 @@ class AduroCoordinator(DataUpdateCoordinator):
         else:
             timers["startup_2_remaining"] = 0
         
+        # Shutdown timer
+        if self._timer_shutdown_started:
+            try:
+                elapsed = (datetime.now() - self._timer_shutdown_started).total_seconds()
+                remaining = max(0, TIMER_SHUTDOWN - int(elapsed))
+                timers["shutdown_remaining"] = remaining
+                
+                if remaining == 0:
+                    self._timer_shutdown_started = None
+            except (TypeError, AttributeError) as err:
+                _LOGGER.debug("Error calculating shutdown timer: %s", err)
+                timers["shutdown_remaining"] = 0
+                self._timer_shutdown_started = None
+        else:
+            timers["shutdown_remaining"] = 0
+            
         data["timers"] = timers
 
     def _calculate_pellet_levels(self, data: dict[str, Any]) -> None:

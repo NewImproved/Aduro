@@ -324,9 +324,6 @@ class AduroSubstateSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "substate", "substate")
         self._attr_icon = "mdi:state-machine"
-        # Remove device_class ENUM since we'll be showing custom formatted text with timer
-        # self._attr_device_class = SensorDeviceClass.ENUM
-        # self._attr_options = [...]
         self._timer_update_task = None
         self._unsub_timer = None
         self._translations = {}
@@ -387,14 +384,19 @@ class AduroSubstateSensor(AduroSensorBase):
             return False
         
         state = self.coordinator.data["operating"].get("state")
+        substate = self.coordinator.data["operating"].get("substate")
         
-        # Timer is active during state 2 or 4
-        return state in ["2", "4"]
+        # Timer is active during state 2, 4, or 14 (substate 0)
+        if state in ["2", "4"]:
+            return True
+        if state == "14" and substate == "0":
+            return True
+        return False
 
-    def _get_live_remaining_time(self, state: str) -> int | None:
+    def _get_live_remaining_time(self, state: str, substate: str) -> int | None:
         """Calculate live remaining time for current state."""
         from datetime import datetime
-        from .const import TIMER_STARTUP_1, TIMER_STARTUP_2
+        from .const import TIMER_STARTUP_1, TIMER_STARTUP_2, TIMER_SHUTDOWN
         
         try:
             if state == "2" and self.coordinator._timer_startup_1_started:
@@ -404,6 +406,11 @@ class AduroSubstateSensor(AduroSensorBase):
             elif state == "4" and self.coordinator._timer_startup_2_started:
                 elapsed = (datetime.now() - self.coordinator._timer_startup_2_started).total_seconds()
                 return max(0, TIMER_STARTUP_2 - int(elapsed))
+            
+            # Shutdown timer for state 14, substate 0
+            elif state == "14" and substate == "0" and self.coordinator._timer_shutdown_started:
+                elapsed = (datetime.now() - self.coordinator._timer_shutdown_started).total_seconds()
+                return max(0, TIMER_SHUTDOWN - int(elapsed))
         except (TypeError, AttributeError) as err:
             _LOGGER.debug("Error calculating live timer: %s", err)
         
@@ -447,9 +454,9 @@ class AduroSubstateSensor(AduroSensorBase):
         status_text = self._get_translated_text(translation_key)
         
         # Add LIVE timer info if applicable
-        if state in ["2", "4"]:
-            remaining = self._get_live_remaining_time(state)
-            if remaining is not None:
+        if state in ["2", "4"] or (state == "14" and substate == "0"):
+            remaining = self._get_live_remaining_time(state, substate)
+            if remaining is not None and remaining > 0:
                 minutes = remaining // 60
                 seconds = remaining % 60
                 return f"{status_text} ({minutes:02d}:{seconds:02d})"
@@ -472,7 +479,6 @@ class AduroSubstateSensor(AduroSensorBase):
         attrs["raw_substate"] = substate
         
         return attrs
-        
 
 
 # =============================================================================

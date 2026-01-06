@@ -403,7 +403,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Started startup timer 2")
 
         if (current_state == "14" and current_substate == "0" and 
-            self._previous_state != "14"):
+            self._previous_state in ("5", "32")):
             self._timer_shutdown_started = datetime.now()
             _LOGGER.debug("Started shutdown timer")
         

@@ -269,6 +269,15 @@
       },
       "low_wood_temp_alert": {
         "name": "Varning låg röktemperatur"
+      },
+      "carbon_monoxide": {
+        "name": "Kolmonoxidnivå"
+      },
+      "carbon_monoxide_yellow": {
+        "name": "Kolmonoxidnivå gul"
+      },
+      "carbon_monoxide_red": {
+        "name": "Kolmonoxidnivå röd"
       }
     },
     "switch": {

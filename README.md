@@ -71,6 +71,8 @@ If you can confirm that the integration work for a stove, please let me know via
 
 ## Installation
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=NewImproved&repository=Aduro&category=integration)
+
 ### HACS (Recommended)
 
 1. Open HACS in Home Assistant

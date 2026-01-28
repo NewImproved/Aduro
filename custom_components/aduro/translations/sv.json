@@ -33,10 +33,12 @@
         "description": "Välj ett konfigurationsområde",
         "data": {
           "stove_model": "Kaminmodell",
-          "stove_ip": "Fast IP Address (Valfritt)"
+          "stove_ip": "Fast IP Address (Valfritt)",
+          "external_temp_sensor": "Extern Temperatur Sensor (Valfritt)"
         },
         "data_description": {
-          "stove_ip": "Lämna tom för automatisk anslutning, eller fyll i för fast IP-adress"
+          "stove_ip": "Lämna tom för automatisk anslutning, eller fyll i för fast IP-adress",
+          "external_temp_sensor": "Välj utomhustemperatursensor för att förbättra beräkning kring tid när all pellets är förbrukad."
         },
         "menu_options": {
           "pellet_settings": "Pelletsinställningar",
@@ -86,6 +88,9 @@
           "auto_resume_after_wood": "Återuppta pelletsdrift automatiskt med tidigare inställningar när vedläget avslutas"
         }
       }
+    },
+    "error": {
+        "sensor_not_found": "Vald sensor hittades inte. Kontrollera entity ID."
     }
   },
   "entity": {
@@ -278,6 +283,9 @@
       },
       "carbon_monoxide_red": {
         "name": "Kolmonoxidnivå röd"
+      },
+      "pellet_depletion": {
+        "name": "Tid för tomt pelletsförråd"
       }
     },
     "switch": {

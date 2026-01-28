@@ -33,10 +33,12 @@
         "description": "Update stove settings",
         "data": {
           "stove_model": "Stove Model",
-          "stove_ip": "Fixed IP Address (Optional)"
+          "stove_ip": "Fixed IP Address (Optional)",
+          "external_temp_sensor": "External Temperature Sensor (Optional)"
         },
         "data_description": {
-          "stove_ip": "Leave empty for automatic discovery, or enter a fixed IP address"
+          "stove_ip": "Leave empty for automatic discovery, or enter a fixed IP address",
+          "external_temp_sensor": "Select an outdoor temperature sensor to improve pellet depletion predictions in temperature mode."
         },
         "menu_options": {
           "pellet_settings": "Pellet Settings",
@@ -86,6 +88,9 @@
           "auto_resume_after_wood": "Automatically resume pellet operation with previous settings when exiting wood mode"
         }
       }
+    },
+    "error": {
+        "sensor_not_found": "The selected sensor was not found. Please check the entity ID."
     }
   },
   "entity": {
@@ -278,6 +283,9 @@
       },
       "carbon_monoxide_red": {
         "name": "Carbon monoxide level red"
+      },
+      "pellet_depletion": {
+        "name": "Pellet Depletion Time"
       }
     },
     "switch": {

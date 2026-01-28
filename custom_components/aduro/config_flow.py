@@ -19,6 +19,7 @@ from .const import (
     CONF_STOVE_PIN,
     CONF_STOVE_MODEL,
     CONF_STOVE_IP,
+    CONF_EXTERNAL_TEMP_SENSOR,
     DEFAULT_STOVE_MODEL,
     STOVE_MODELS,
 )
@@ -134,6 +135,19 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                 else:
                     user_input.pop(CONF_STOVE_IP, None)
                 
+                # Validate external temperature sensor if provided
+                external_temp_sensor = user_input.get(CONF_EXTERNAL_TEMP_SENSOR, "").strip()
+                if external_temp_sensor:
+                    # Check if entity exists
+                    state = self.hass.states.get(external_temp_sensor)
+                    if state is None:
+                        _LOGGER.warning("External temperature sensor not found: %s", external_temp_sensor)
+                        errors[CONF_EXTERNAL_TEMP_SENSOR] = "sensor_not_found"
+                    else:
+                        user_input[CONF_EXTERNAL_TEMP_SENSOR] = external_temp_sensor
+                else:
+                    user_input.pop(CONF_EXTERNAL_TEMP_SENSOR, None)
+                
                 if not errors:
                     # Merge with existing data, preserving serial and PIN
                     new_data = {
@@ -147,10 +161,17 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                     else:
                         new_data.pop(CONF_STOVE_IP, None)
                     
+                    # Handle external temp sensor: add if present, remove if empty
+                    if CONF_EXTERNAL_TEMP_SENSOR in user_input:
+                        new_data[CONF_EXTERNAL_TEMP_SENSOR] = user_input[CONF_EXTERNAL_TEMP_SENSOR]
+                    else:
+                        new_data.pop(CONF_EXTERNAL_TEMP_SENSOR, None)
+                    
                     _LOGGER.info(
-                        "Updating entry - Model: %s, IP: %s",
+                        "Updating entry - Model: %s, IP: %s, External Temp Sensor: %s",
                         new_data.get(CONF_STOVE_MODEL),
-                        new_data.get(CONF_STOVE_IP, "auto-discovery")
+                        new_data.get(CONF_STOVE_IP, "auto-discovery"),
+                        new_data.get(CONF_EXTERNAL_TEMP_SENSOR, "not configured")
                     )
                     
                     # Update the config entry data
@@ -158,6 +179,14 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                         self.config_entry,
                         data=new_data
                     )
+                    
+                    # Update coordinator with new external temp sensor
+                    coordinator = self.hass.data[DOMAIN][self.config_entry.entry_id]
+                    coordinator._external_temp_sensor = new_data.get(CONF_EXTERNAL_TEMP_SENSOR)
+                    
+                    # Save the configuration
+                    await coordinator.async_save_pellet_data()
+                    
                     return self.async_create_entry(title="", data={})
             except Exception as err:
                 _LOGGER.exception("Unexpected error in options flow: %s", err)
@@ -166,6 +195,7 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
         # Get current values
         current_model = self.config_entry.data.get(CONF_STOVE_MODEL, DEFAULT_STOVE_MODEL)
         current_ip = self.config_entry.data.get(CONF_STOVE_IP, "")
+        current_external_temp = self.config_entry.data.get(CONF_EXTERNAL_TEMP_SENSOR, "")
 
         options_schema = vol.Schema(
             {
@@ -176,6 +206,11 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                     )
                 ),
                 vol.Optional(CONF_STOVE_IP, description={"suggested_value": current_ip}): cv.string,
+                vol.Optional(CONF_EXTERNAL_TEMP_SENSOR, description={"suggested_value": current_external_temp}): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["sensor", "weather"],
+                    )
+                ),
             }
         )
 
@@ -185,6 +220,7 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
             errors=errors,
             description_placeholders={
                 "model_info": "Update your Aduro stove model",
-                "ip_info": "Optional: Enter a fixed IP address for your stove. Leave empty for automatic discovery."
+                "ip_info": "Optional: Enter a fixed IP address for your stove. Leave empty for automatic discovery.",
+                "external_temp_info": "Optional: Select an external temperature sensor for improved pellet depletion predictions."
             },
         )

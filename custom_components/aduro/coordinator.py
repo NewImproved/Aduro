@@ -1507,7 +1507,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         "count": 0,
                         "total_consumption": 0.0,
                         "avg_consumption": 0.15,
-                        "avg_duration": 360,
+                        "avg_duration": 900,
                     }),
                     "shutdown_restart_deltas": shutdown_restart_deltas
                 }

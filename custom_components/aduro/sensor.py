@@ -78,9 +78,10 @@ async def async_setup_entry(
         AduroConsumptionYesterdaySensor(coordinator, entry),
         AduroConsumptionMonthSensor(coordinator, entry),
         AduroConsumptionYearSensor(coordinator, entry),
-        AduroMonthlyHistorySensor(coordinator, entry),
-        AduroYearlyHistorySensor(coordinator, entry),
         AduroYearOverYearSensor(coordinator, entry),
+
+        # Pellet depletion prediction
+        AduroPelletDepletionSensor(coordinator, entry),
         
         # Network sensors
         AduroStoveIPSensor(coordinator, entry),
@@ -855,56 +856,6 @@ class AduroConsumptionMonthSensor(AduroSensorBase):
             current_value = self.coordinator.data["consumption"].get("month")
         return self._get_cached_value(current_value)
 
-
-class AduroConsumptionYearSensor(AduroSensorBase):
-    """Sensor for this year's consumption."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "consumption_year", "consumption_year")
-        self._attr_device_class = SensorDeviceClass.WEIGHT
-        self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
-        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-        self._attr_icon = "mdi:grain"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return this year's consumption."""
-        current_value = None
-        if self.coordinator.data and "consumption" in self.coordinator.data:
-            current_value = self.coordinator.data["consumption"].get("year")
-        return self._get_cached_value(current_value)
-
-
-class AduroMonthlyHistorySensor(AduroSensorBase):
-    """Sensor showing monthly consumption history."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, entry, "monthly_history", "monthly_history")
-        self._attr_icon = "mdi:grain"
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if not super().available:
-            return False
-        # Check if we have consumption data
-        if not self.coordinator.data:
-            return False
-        if "consumption" not in self.coordinator.data:
-            return False
-        return True
-
-    @property
-    def native_value(self) -> str | None:
-        """Return current month's consumption."""
-        if not self.coordinator.data or "consumption" not in self.coordinator.data:
-            return None
-        consumption = self.coordinator.data["consumption"]
-        month_value = consumption.get("month", 0)
-        return str(round(month_value, 2)) if month_value else "0"
-
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return all monthly data as attributes."""
@@ -927,35 +878,25 @@ class AduroMonthlyHistorySensor(AduroSensorBase):
             attrs["snapshots"] = snapshots
         
         return attrs
-        
-class AduroYearlyHistorySensor(AduroSensorBase):
-    """Sensor showing yearly consumption history."""
+
+class AduroConsumptionYearSensor(AduroSensorBase):
+    """Sensor for this year's consumption."""
 
     def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry, "yearly_history", "yearly_history")
+        super().__init__(coordinator, entry, "consumption_year", "consumption_year")
+        self._attr_device_class = SensorDeviceClass.WEIGHT
+        self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         self._attr_icon = "mdi:grain"
 
     @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if not super().available:
-            return False
-        # Check if we have consumption data
-        if not self.coordinator.data:
-            return False
-        if "consumption" not in self.coordinator.data:
-            return False
-        return True
-
-    @property
-    def native_value(self) -> str | None:
-        """Return current year's consumption."""
-        if not self.coordinator.data or "consumption" not in self.coordinator.data:
-            return None
-        consumption = self.coordinator.data["consumption"]
-        year_value = consumption.get("year", 0)
-        return str(round(year_value, 2)) if year_value else "0"
+    def native_value(self) -> float | None:
+        """Return this year's consumption."""
+        current_value = None
+        if self.coordinator.data and "consumption" in self.coordinator.data:
+            current_value = self.coordinator.data["consumption"].get("year")
+        return self._get_cached_value(current_value)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -970,7 +911,6 @@ class AduroYearlyHistorySensor(AduroSensorBase):
             return {}
         
         return history
-        
 
 class AduroYearOverYearSensor(AduroSensorBase):
     """Sensor showing year-over-year consumption comparison."""
@@ -1655,5 +1595,159 @@ class AduroLowWoodTempAlertSensor(AduroSensorBase):
             elif time_info["state"] == "exceeded":
                 attrs["exceeded_by_seconds"] = time_info["exceeded_by"]
                 attrs["exceeded_by_minutes"] = round(time_info["exceeded_by"] / 60, 1)
+        
+        return attrs
+
+# =============================================================================
+# Pellet Depletion Prediction Sensor
+# =============================================================================
+
+class AduroPelletDepletionSensor(AduroSensorBase):
+    """Sensor for pellet depletion prediction."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, "pellet_depletion", "pellet_depletion")
+        self._attr_icon = "mdi:clock-alert-outline"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the datetime when pellets will be depleted."""
+        prediction = self.coordinator.predict_pellet_depletion()
+        
+        if not prediction:
+            return "N/A"
+        
+        status = prediction.get("status")
+        
+        if status == "insufficient_data":
+            return "Insufficient data"
+        elif status == "empty":
+            return "Empty"
+        elif status == "ok":
+            depletion_dt = prediction.get("depletion_datetime")
+            if depletion_dt:
+                # Format as "2026-01-17 23:30"
+                return depletion_dt.strftime("%Y-%m-%d %H:%M")
+            return "Unknown"
+        
+        return "N/A"
+
+    @property
+    def icon(self) -> str:
+        """Return icon based on prediction status."""
+        prediction = self.coordinator.predict_pellet_depletion()
+        
+        if not prediction:
+            return "mdi:help-circle-outline"
+        
+        status = prediction.get("status")
+        
+        if status == "empty":
+            return "mdi:alert-circle"
+        elif status == "insufficient_data":
+            return "mdi:database-off-outline"
+        elif status == "ok":
+            confidence = prediction.get("confidence", "medium")
+            if confidence == "high":
+                return "mdi:clock-check-outline"
+            elif confidence == "low":
+                return "mdi:clock-alert-outline"
+            else:
+                return "mdi:clock-outline"
+        
+        return "mdi:clock-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        # Always show learning status, even when stove is off
+        learning_status = self.coordinator._get_learning_status()
+        
+        attrs = {
+            "learning_heatlevel_1_hours": learning_status.get("heatlevel_1_hours", 0),
+            "learning_heatlevel_2_hours": learning_status.get("heatlevel_2_hours", 0),
+            "learning_heatlevel_3_hours": learning_status.get("heatlevel_3_hours", 0),
+            "learning_waiting_periods": learning_status.get("waiting_periods_observed", 0),
+            "learning_recent_data": learning_status.get("recent_data", False),
+            "learning_sufficient_data": learning_status.get("sufficient_data", False),
+            "learning_total_heating_obs": learning_status.get("total_heating_observations", 0),
+            "learning_total_cooling_obs": learning_status.get("total_cooling_observations", 0),
+        }
+
+        # Add learning consumption tracker info
+        attrs["learning_consumption_total"] = round(self.coordinator._learning_consumption_total, 2)
+        if learning_status.get("total_heating_observations", 0) > 0:
+            attrs["learning_avg_consumption_per_obs"] = round(
+                self.coordinator._learning_consumption_total / learning_status.get("total_heating_observations", 1),
+                2
+            )
+        
+        # Add startup observation info
+        startup_obs = self.coordinator._learning_data.get("startup_observations", {})
+        attrs["learning_startup_count"] = startup_obs.get("count", 0)
+        attrs["learning_startup_avg_consumption"] = round(startup_obs.get("avg_consumption", 0), 3)
+        attrs["learning_startup_avg_duration"] = round(startup_obs.get("avg_duration", 0) / 60, 1)  # Convert to minutes
+        
+        # External temperature info (always show if configured)
+        if self.coordinator._external_temp_sensor:
+            attrs["external_temp_sensor"] = self.coordinator._external_temp_sensor
+            external_temp = self.coordinator._get_external_temperature()
+            if external_temp is not None:
+                attrs["external_temp_value"] = round(external_temp, 1)
+        
+        # Get prediction data
+        prediction = self.coordinator.predict_pellet_depletion()
+        
+        if not prediction:
+            attrs["status"] = "not_available"
+            attrs["message"] = "Stove is off or in wood mode"
+            return attrs
+        
+        status = prediction.get("status")
+        attrs["status"] = status
+        
+        if status == "insufficient_data":
+            attrs.update({
+                "message": "Collecting data. Need 5+ hours per heat level and 5+ waiting periods.",
+            })
+            return attrs
+        
+        if status == "empty":
+            attrs.update({
+                "depletion_datetime": prediction.get("depletion_datetime").isoformat() if prediction.get("depletion_datetime") else None,
+                "message": "Pellets depleted",
+            })
+            return attrs
+        
+        if status == "ok":
+            attrs.update({
+                "time_remaining_seconds": prediction.get("time_remaining_seconds"),
+                "time_remaining_hours": round(prediction.get("time_remaining_seconds", 0) / 3600, 1),
+                #"depletion_datetime": prediction.get("depletion_datetime").isoformat() if prediction.get("depletion_datetime") else None,
+                "time_remaining_formatted": prediction.get("time_remaining_formatted")  if prediction.get("time_remaining_formatted") else None,
+                "confidence": prediction.get("confidence", "unknown"),
+                "mode": prediction.get("mode", "unknown"),
+            })
+            
+            # Mode-specific attributes
+            if prediction.get("mode") == "heatlevel":
+                attrs.update({
+                    "current_heatlevel": prediction.get("current_heatlevel"),
+                    "consumption_rate_kg_per_hour": prediction.get("consumption_rate"),
+                })
+            elif prediction.get("mode") == "temperature":
+                attrs.update({
+                    "cycles_remaining": prediction.get("cycles_remaining"),
+                    "current_phase": prediction.get("current_phase"),
+                    "shutdown_delta": prediction.get("shutdown_delta"),
+                    "restart_delta": prediction.get("restart_delta"),
+                })
+
+                # Add shutdown/restart observation counts
+                shutdown_data = self.coordinator._learning_data["shutdown_restart_deltas"]["shutdown"]
+                restart_data = self.coordinator._learning_data["shutdown_restart_deltas"]["restart"]
+                attrs["learning_shutdown_count"] = shutdown_data.get("count", 0)
+                attrs["learning_restart_count"] = restart_data.get("count", 0)
         
         return attrs

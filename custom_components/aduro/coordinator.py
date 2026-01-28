@@ -2235,10 +2235,10 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Determine sufficiency
         sufficient_data = (
-            heatlevel_hours[1] >= 0 and
-            heatlevel_hours[2] >= 0 and
-            heatlevel_hours[3] >= 0 and
-            waiting_periods >= 0 and
+            heatlevel_hours[1] >= 10 and
+            heatlevel_hours[2] >= 10 and
+            heatlevel_hours[3] >= 10 and
+            waiting_periods >= 5 and
             recent_data
         )
         

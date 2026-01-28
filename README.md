@@ -46,7 +46,7 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 
 **Pellet Depletion Prediction**
 
-Intelligent prediction system that learns your stove's actual consumption patterns and predicts when pellets will run out, including date and time.
+- A prediction system that learns your stove's actual consumption patterns and predicts when pellets will run out, including date and time.
 
 <details>
 <summary><strong>How it works</strong></summary>

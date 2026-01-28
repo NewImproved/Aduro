@@ -44,6 +44,134 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 a
 - Change-in-progress detection
 - Automatic state synchronization
 
+**Pellet Depletion Prediction**
+
+Intelligent prediction system that learns your stove's actual consumption patterns and predicts when pellets will run out, including date and time.
+
+<details>
+<summary><strong>How it works</strong></summary>
+
+
+### Learning Phase
+
+The system automatically learns from your stove's operation by tracking:
+
+***1. Startup Consumption***
+
+- Ignition and flame establishment phase
+- Average pellet consumption per startup
+- Typical startup duration
+
+
+***2. Stable Operation Consumption (Heat Level & Temperature Modes)***
+
+- Heat Level 1, 2, and 3 consumption rates (kg/hour)
+- Heating rates (how fast room temperature increases)
+- Adapts to different conditions:
+   - Temperature delta (how far below target)
+   - Outdoor temperature (if configured)
+
+***3. Cooling/Waiting Periods (Temperature Mode Only)***
+
+- Room cooling rates during waiting
+- Shutdown threshold (how far above target before stove stops)
+- Restart threshold (how far below target before stove restarts)
+
+
+
+***Data Collection***
+
+- Records observations every 30 minutes during stable operation
+- Records when heat levels change
+- Records when stove stops/starts
+- Filters out user-interrupted cycles (only learns automatic behavior)
+- Handles midnight consumption reset automatically
+- Stores all data persistently across restarts
+
+### Prediction Modes
+
+***Heat Level Mode (Simple):***
+
+- Adds startup consumption once
+- Calculates continuous operation until pellets depleted
+- Formula: `time = startup + (pellets / consumption_rate)`
+
+***Temperature Mode (Complex):***
+
+- Simulates complete heating cycles:
+  1. Startup consumption
+  2. Heating phases (adjusting between heat levels 1-3 based on temperature)
+  3. Waiting periods (room cooling)
+  4. Automatic restart when temperature drops
+- Predicts multiple cycles until pellets run out
+- Accounts for stove's automatic level adjustments every 10+ minutes
+
+### Prediction Accuracy
+
+***High Confidence:***
+
+- 10+ hours learned per heat level
+- Recent data (within 60 days)
+- Heat level mode operation
+- Fewer than 3 cycles predicted
+
+***Medium Confidence:***
+
+- Some learning data available
+- 3-8 cycles predicted in temperature mode
+- Established consumption patterns
+
+***Low Confidence:***
+
+- Minimal learning data
+- 8+ cycles predicted
+- Missing external temperature sensor (when configured)
+
+### What You See
+
+***Sensor Display***
+
+- ***Main Value:*** Date and time when pellets will be depleted (e.g., "2026-01-17 23:30")
+- ***Status Messages:***
+   - "Insufficient data" - Still learning (need 10hrs+ per heat level, 5+ waiting periods)
+   - "Empty" - No pellets remaining
+   - "N/A" - Stove off or in wood mode
+
+***Sensor Attributes***
+- Time remaining (hours)
+- Depletion datetime (ISO format)
+- Confidence level (high/medium/low)
+- Current operation mode
+- Consumption rate (kg/hour)
+- Cycles remaining (temperature mode)
+- Learning progress:
+   - Hours observed per heat level
+   - Number of waiting periods observed
+   - Total heating/cooling observations
+   - Startup observations count
+   - Total pellets learned from (kg)
+   - Shutdown/restart observation counts
+
+### Key Features
+- ***Fully Automatic*** - No configuration needed, learns while you use the stove
+- ***Adapts to Your Home*** - Learns your specific heating patterns and conditions
+- ***Handles Midnight*** - Consumption tracking works across midnight resets
+- ***Filters User Behavior*** - Only learns automatic stove behavior, not manual interventions
+- ***Persistent*** - All learning data saved and restored across restarts
+- ***Multi-Condition*** - Learns different consumption rates for different temperatures and conditions
+- ***Real-Time Updates*** - Predictions update as conditions change
+- ***Optional External Sensor*** - Improved accuracy with outdoor temperature sensor
+
+### Minimum Data Requirements
+
+Before showing predictions, the system needs:
+
+- ***10+ hours*** of observations at each heat level (1, 2, 3)
+- ***5+ waiting periods*** observed (temperature mode)
+- ***Recent data*** (within last 60 days)
+</details>
+
+
 **Multi-Language Support**
 - English
 - Danish

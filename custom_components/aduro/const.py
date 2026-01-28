@@ -10,6 +10,7 @@ CONF_STOVE_SERIAL: Final = "stove_serial"
 CONF_STOVE_PIN: Final = "stove_pin"
 CONF_STOVE_MODEL: Final = "stove_model"
 CONF_STOVE_IP: Final = "stove_ip"
+CONF_EXTERNAL_TEMP_SENSOR = "external_temp_sensor"
 
 # Stove models
 STOVE_MODEL_H1: Final = "H1"

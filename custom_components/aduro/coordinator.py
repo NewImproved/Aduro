@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+import datetime as dt_module
 import logging
 from typing import Any
+import math
 
 from pyduro.actions import discover, get, set, raw, STATUS_PARAMS
 
@@ -26,6 +28,7 @@ from .const import (
     CONF_STOVE_PIN,
     CONF_STOVE_MODEL,
     CONF_STOVE_IP,
+    CONF_EXTERNAL_TEMP_SENSOR,
     DEFAULT_SCAN_INTERVAL,
     UPDATE_INTERVAL_FAST,
     UPDATE_INTERVAL_NORMAL,
@@ -122,7 +125,48 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._low_wood_temp_start_time: datetime | None = None
         self._low_wood_alert_active = False
         self._low_wood_alert_sent = False
+
+        # Learning system for pellet depletion prediction
+        self._learning_data = {
+            "heating_observations": {},
+            "cooling_observations": {},
+            "startup_observations": {
+                "count": 0,
+                "total_consumption": 0.0,
+                "avg_consumption": 0.15,  # Default: 150g per startup
+                "avg_duration": 360,      # Default: 6 minutes
+            },
+            "shutdown_restart_deltas": {
+                "shutdown": {
+                    "count": 0,
+                    "total_delta": 0.0,
+                    "avg_delta": 1.1,  # Default: target + 1.1°C
+                },
+                "restart": {
+                    "count": 0,
+                    "total_delta": 0.0,
+                    "avg_delta": 0.6,  # Default: target - 0.6°C
+                }
+            }
+        }
         
+        # Learning consumption tracker (separate from pellet refill counter)
+        self._learning_consumption_total = 0.0  # Total kg consumed during all learning sessions
+        self._last_consumption_day_for_learning = None  # Last known consumption_day value
+
+        # Current session tracking for learning
+        self._current_heating_session = None  # Tracks current stable heating period
+        self._current_cooling_session = None  # Tracks current cooling/waiting period
+        self._current_startup_session = None  # Tracks startup consumption (states 2→4→32→5)
+        self._last_learning_state = None
+        self._last_learning_heatlevel = None
+        self._last_learning_room_temp = None
+        self._last_learning_timestamp = None
+        
+        # External temperature sensor configuration
+        self._external_temp_sensor = entry.data.get(CONF_EXTERNAL_TEMP_SENSOR)
+        self._external_temp_value = None
+
         # Timer tracking
         self._timer_startup_1_started: datetime | None = None
         self._timer_startup_2_started: datetime | None = None
@@ -245,6 +289,13 @@ class AduroCoordinator(DataUpdateCoordinator):
             # Check temperature alert conditions
             _LOGGER.debug("Checking temperature alerts")
             await self._check_temperature_alerts(data)
+
+            # Track state changes for learning
+            _LOGGER.debug("Tracking learning state changes")
+            self._track_learning_state_changes(data)
+
+            # Update learning consumption tracker
+            self._update_learning_consumption_tracker(data)
 
             # Add calculated/derived data
             _LOGGER.debug("Adding calculated data")
@@ -1363,7 +1414,153 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._high_smoke_duration_threshold = data.get("high_smoke_duration_threshold", 30)
                 self._low_wood_temp_threshold = data.get("low_wood_temp_threshold", 175.0)
                 self._low_wood_duration_threshold = data.get("low_wood_duration_threshold", 300)
+
+                # Load learning data (convert string keys back to tuples)
+                _LOGGER.info("=== Starting to load learning data ===")
                 
+                loaded_learning_data = data.get("learning_data", {
+                    "heating_observations": {},
+                    "cooling_observations": {},
+                    "startup_observations": {
+                        "count": 0,
+                        "total_consumption": 0.0,
+                        "avg_consumption": 0.15,
+                        "avg_duration": 360,
+                    },
+                    "shutdown_restart_deltas": {}
+                })
+                
+                _LOGGER.info("Found %d heating observations in file", 
+                           len(loaded_learning_data.get("heating_observations", {})))
+                _LOGGER.info("Found %d cooling observations in file", 
+                           len(loaded_learning_data.get("cooling_observations", {})))
+                
+                # Convert heating observations string keys back to tuples
+                heating_obs = {}
+                for key_str, value in loaded_learning_data.get("heating_observations", {}).items():
+                    _LOGGER.debug("Processing heating obs key: %s", key_str)
+                    try:
+                        # Parse string like "(1, 2.0, -4)" back to tuple (1, 2.0, -4)
+                        key_tuple = eval(key_str)
+                        _LOGGER.debug("Parsed key to tuple: %s", key_tuple)
+                        
+                        if isinstance(key_tuple, tuple):
+                            # Convert last_updated string back to datetime object
+                            if "last_updated" in value and isinstance(value["last_updated"], str):
+                                try:
+                                    value["last_updated"] = dt_module.datetime.fromisoformat(value["last_updated"])
+                                    _LOGGER.debug("Converted last_updated to datetime")
+                                except (ValueError, TypeError) as e:
+                                    _LOGGER.warning("Failed to parse datetime: %s", e)
+                                    value["last_updated"] = dt_module.datetime.now()
+                            heating_obs[key_tuple] = value
+                            _LOGGER.debug("Successfully added heating obs: count=%d", value.get("count", 0))
+                        else:
+                            _LOGGER.warning("Key is not a tuple: %s (type: %s)", key_tuple, type(key_tuple))
+                    except Exception as err:
+                        _LOGGER.error("Failed to parse heating observation key '%s': %s", key_str, err, exc_info=True)
+                
+                # Convert cooling observations string keys back to tuples
+                cooling_obs = {}
+                for key_str, value in loaded_learning_data.get("cooling_observations", {}).items():
+                    try:
+                        key_tuple = eval(key_str)
+                        if isinstance(key_tuple, tuple):
+                            # Convert last_updated string back to datetime object
+                            if "last_updated" in value and isinstance(value["last_updated"], str):
+                                try:
+                                    value["last_updated"] = dt_module.datetime.fromisoformat(value["last_updated"])
+                                except (ValueError, TypeError):
+                                    value["last_updated"] = dt_module.datetime.now()
+                            cooling_obs[key_tuple] = value
+                    except Exception as err:
+                        _LOGGER.error("Failed to parse cooling observation key '%s': %s", key_str, err, exc_info=True)
+
+                # Handle shutdown_restart_deltas
+                loaded_deltas = loaded_learning_data.get("shutdown_restart_deltas", {})
+                
+                # Check if there is saved data
+                if "shutdown" in loaded_deltas:
+                    # New format - use as-is
+                    shutdown_restart_deltas = loaded_deltas
+                    _LOGGER.debug("Loaded shutdown_restart_deltas")
+                else:
+                    # No data - use defaults
+                    shutdown_restart_deltas = {
+                        "shutdown": {
+                            "count": 0,
+                            "total_delta": 0.0,
+                            "avg_delta": 1.1,
+                        },
+                        "restart": {
+                            "count": 0,
+                            "total_delta": 0.0,
+                            "avg_delta": 0.6,
+                        }
+                    }
+                    _LOGGER.debug("No shutdown_restart_deltas found, using defaults")
+                
+                self._learning_data = {
+                    "heating_observations": heating_obs,
+                    "cooling_observations": cooling_obs,
+                    "startup_observations": loaded_learning_data.get("startup_observations", {
+                        "count": 0,
+                        "total_consumption": 0.0,
+                        "avg_consumption": 0.15,
+                        "avg_duration": 360,
+                    }),
+                    "shutdown_restart_deltas": shutdown_restart_deltas
+                }
+                
+                _LOGGER.info(
+                    "=== Loaded learning data: %d heating obs, %d cooling obs ===",
+                    len(self._learning_data["heating_observations"]),
+                    len(self._learning_data["cooling_observations"])
+                )
+
+                _LOGGER.info(
+                    "Loaded startup observations: count=%d, avg_consumption=%.3f kg, avg_duration=%d sec",
+                    self._learning_data["startup_observations"]["count"],
+                    self._learning_data["startup_observations"]["avg_consumption"],
+                    self._learning_data["startup_observations"]["avg_duration"]
+                )
+
+                _LOGGER.info(
+                    "Loaded shutdown/restart deltas: shutdown (count=%d, avg=%.2f°C), restart (count=%d, avg=%.2f°C)",
+                    self._learning_data["shutdown_restart_deltas"]["shutdown"]["count"],
+                    self._learning_data["shutdown_restart_deltas"]["shutdown"]["avg_delta"],
+                    self._learning_data["shutdown_restart_deltas"]["restart"]["count"],
+                    self._learning_data["shutdown_restart_deltas"]["restart"]["avg_delta"]
+                )
+                
+                # Log sample observations
+                for i, (key, obs) in enumerate(list(self._learning_data["heating_observations"].items())[:3]):
+                    _LOGGER.info("Sample heating obs #%d: key=%s, count=%d, heating_rate=%.2f, consumption_rate=%.2f", 
+                                i+1, key, obs.get("count", 0), obs.get("avg_heating_rate", 0), obs.get("avg_consumption_rate", 0))
+                
+                # Load external temperature sensor config
+                self._external_temp_sensor = data.get("external_temp_sensor")
+
+                # Load learning consumption tracker
+                self._learning_consumption_total = data.get("learning_consumption_total", 0.0)
+                self._last_consumption_day_for_learning = data.get("last_consumption_day_for_learning")
+
+                _LOGGER.info(
+                    "Loaded learning data: %d heating observations, %d cooling observations",
+                    len(self._learning_data.get("heating_observations", {})),
+                    len(self._learning_data.get("cooling_observations", {}))
+                )
+
+                _LOGGER.info(
+                    "Loaded learning consumption tracker: %.3f kg total",
+                    self._learning_consumption_total
+                )
+
+                # Debug: Log first few observations
+                for key, obs in list(self._learning_data["heating_observations"].items())[:3]:
+                    _LOGGER.info("Sample heating obs: key=%s, count=%d, heating_rate=%.2f", 
+                                key, obs.get("count", 0), obs.get("avg_heating_rate", 0))
+
                 # Convert last_consumption_day string back to date object
                 last_day_str = data.get("last_consumption_day")
                 if last_day_str:
@@ -1387,6 +1584,1022 @@ class AduroCoordinator(DataUpdateCoordinator):
         except Exception as err:
             _LOGGER.warning("Failed to load pellet data from storage: %s", err)
 
+    def _get_temp_delta_bucket(self, temp_delta: float) -> float:
+        """Get temperature delta bucket (0.5°C increments)."""
+        return round(temp_delta * 2) / 2  # Rounds to nearest 0.5
+    
+    def _get_outdoor_temp_bucket(self, outdoor_temp: float) -> int:
+        """Get outdoor temperature bucket (2°C increments)."""
+        return int(math.floor(outdoor_temp / 2) * 2)  # Rounds down to nearest 2
+    
+    def _get_external_temperature(self) -> float | None:
+        """Get current external temperature from configured sensor."""
+        if not self._external_temp_sensor:
+            return None
+        
+        try:
+            state = self.hass.states.get(self._external_temp_sensor)
+            if state and state.state not in ('unknown', 'unavailable'):
+                return float(state.state)
+        except (ValueError, TypeError) as err:
+            _LOGGER.debug("Failed to get external temperature: %s", err)
+        
+        return None
+    
+    def _record_heating_observation(
+        self,
+        heatlevel: int,
+        duration_seconds: int,
+        start_room_temp: float,
+        end_room_temp: float,
+        target_temp: float,
+        consumption_kg: float,
+    ) -> None:
+        """Record a heating observation for learning."""
+        temp_delta_start = target_temp - start_room_temp
+        temp_delta_avg = target_temp - ((start_room_temp + end_room_temp) / 2)
+        
+        # Calculate rates
+        duration_hours = duration_seconds / 3600
+        heating_rate = (end_room_temp - start_room_temp) / duration_hours if duration_hours > 0 else 0
+        consumption_rate = consumption_kg / duration_hours if duration_hours > 0 else 0
+        
+        # Get buckets
+        temp_delta_bucket = self._get_temp_delta_bucket(temp_delta_avg)
+        outdoor_temp = self._get_external_temperature()
+        outdoor_bucket = self._get_outdoor_temp_bucket(outdoor_temp) if outdoor_temp is not None else None
+        
+        # Create key
+        key = (heatlevel, temp_delta_bucket, outdoor_bucket)
+        
+        # Update or create observation
+        if key not in self._learning_data["heating_observations"]:
+            self._learning_data["heating_observations"][key] = {
+                "count": 0,
+                "total_heating_rate": 0.0,
+                "total_consumption_rate": 0.0,
+                "avg_heating_rate": 0.0,
+                "avg_consumption_rate": 0.0,
+                "last_updated": datetime.now(),
+            }
+        
+        obs = self._learning_data["heating_observations"][key]
+        
+        # Update running average
+        obs["total_heating_rate"] += heating_rate
+        obs["total_consumption_rate"] += consumption_rate
+        obs["avg_heating_rate"] = obs["total_heating_rate"] / (obs["count"] + 1)
+        obs["avg_consumption_rate"] = obs["total_consumption_rate"] / (obs["count"] + 1)
+        obs["count"] += 1
+        obs["last_updated"] = datetime.now()
+        
+        _LOGGER.info(
+            "Recorded heating observation: HL=%d, temp_delta=%.1f°C, outdoor=%s°C, "
+            "heating_rate=%.2f°C/h, consumption_rate=%.2f kg/h (count=%d)",
+            heatlevel, temp_delta_bucket, outdoor_bucket, heating_rate, consumption_rate, obs["count"]
+        )
+
+        # Trigger immediate save
+        asyncio.create_task(self.async_save_pellet_data())
+
+    def _record_cooling_observation(
+        self,
+        duration_seconds: int,
+        start_room_temp: float,
+        end_room_temp: float,
+        target_temp: float,
+    ) -> None:
+        """Record a cooling observation for learning."""
+        duration_hours = duration_seconds / 3600
+        cooling_rate = (start_room_temp - end_room_temp) / duration_hours if duration_hours > 0 else 0
+        
+        # Get outdoor bucket
+        outdoor_temp = self._get_external_temperature()
+        outdoor_bucket = self._get_outdoor_temp_bucket(outdoor_temp) if outdoor_temp is not None else None
+        
+        # Create key (outdoor temp and start temp)
+        start_temp_bucket = int(math.floor(start_room_temp / 2) * 2)
+        key = (outdoor_bucket, start_temp_bucket)
+        
+        # Update or create observation
+        if key not in self._learning_data["cooling_observations"]:
+            self._learning_data["cooling_observations"][key] = {
+                "count": 0,
+                "total_cooling_rate": 0.0,
+                "avg_cooling_rate": 0.0,
+                "last_updated": datetime.now(),
+            }
+        
+        obs = self._learning_data["cooling_observations"][key]
+        
+        # Update running average
+        obs["total_cooling_rate"] += cooling_rate
+        obs["avg_cooling_rate"] = obs["total_cooling_rate"] / (obs["count"] + 1)
+        obs["count"] += 1
+        obs["last_updated"] = datetime.now()
+        
+        _LOGGER.info(
+            "Recorded cooling observation: start_temp=%.1f°C, outdoor=%s°C, "
+            "cooling_rate=%.2f°C/h (count=%d)",
+            start_room_temp, outdoor_bucket, cooling_rate, obs["count"]
+        )
+
+        # Trigger immediate save
+        asyncio.create_task(self.async_save_pellet_data())
+    
+    def _record_startup_observation(
+        self,
+        duration_seconds: int,
+        consumption_kg: float,
+    ) -> None:
+        """Record a startup observation for learning."""
+        startup = self._learning_data["startup_observations"]
+        
+        # Update running average
+        startup["total_consumption"] += consumption_kg
+        startup["avg_consumption"] = startup["total_consumption"] / (startup["count"] + 1)
+        # Duration doesn't need total tracking, just update average
+        startup["avg_duration"] = (
+            (startup["avg_duration"] * startup["count"] + duration_seconds) / (startup["count"] + 1)
+        )
+        startup["count"] += 1
+        
+        _LOGGER.info(
+            "Recorded startup observation: consumption=%.3f kg, duration=%d sec (count=%d, avg=%.3f kg)",
+            consumption_kg,
+            duration_seconds,
+            startup["count"],
+            startup["avg_consumption"]
+        )
+        
+        # Trigger save
+        asyncio.create_task(self.async_save_pellet_data())
+
+    def _track_learning_state_changes(self, data: dict[str, Any]) -> None:
+        """Track state changes for learning system."""
+        if "operating" not in data or "status" not in data:
+            return
+        
+        current_state = data["operating"].get("state")
+        current_heatlevel = data["operating"].get("heatlevel")
+        current_room_temp = data["operating"].get("boiler_temp")
+        current_target_temp = data["operating"].get("boiler_ref")
+        current_operation_mode = data["status"].get("operation_mode")
+        current_time = datetime.now()
+        
+        # Track heating in both heat level mode (0) and temperature mode (1)
+        # Track cooling only in temperature mode (1) when stove enters waiting
+        if current_operation_mode not in [0, 1]:
+            self._current_heating_session = None
+            self._current_cooling_session = None
+            self._last_learning_state = None
+            return
+        
+        # Burning states
+        is_actively_burning = current_state in ["5", "32"]  # Stable operation
+        is_starting_up = current_state in ["2", "4"]        # Ignition/startup
+        is_burning = is_actively_burning or is_starting_up  # Any burning state
+        
+        # Waiting/off state
+        is_waiting = current_state == "6"
+
+        # Startup tracking
+        is_in_startup = current_state in ["2", "4", "32"]  # Startup sequence
+        reached_stable = current_state == "5"  # Startup complete
+        
+        # === STARTUP SESSION TRACKING ===
+        if is_in_startup:
+            if self._current_startup_session is None:
+                # Start new startup session
+                self._current_startup_session = {
+                    "start_time": current_time,
+                    "start_learning_consumption": self._learning_consumption_total,
+                }
+                _LOGGER.info("Startup session started (state: %s)", current_state)
+        
+        # Startup complete - reached stable operation
+        elif reached_stable and self._current_startup_session is not None:
+            session = self._current_startup_session
+            duration = (current_time - session["start_time"]).total_seconds()
+            consumption = self._learning_consumption_total - session["start_learning_consumption"]
+            
+            # Only record if reasonable (duration > 60s, consumption > 0)
+            if duration > 60 and consumption > 0:
+                self._record_startup_observation(
+                    duration_seconds=int(duration),
+                    consumption_kg=consumption,
+                )
+                _LOGGER.info(
+                    "Startup completed - duration: %.1f min, consumption: %.3f kg",
+                    duration / 60,
+                    consumption
+                )
+            else:
+                _LOGGER.warning(
+                    "Startup session invalid (duration: %.1fs, consumption: %.3f kg), not recording",
+                    duration,
+                    consumption
+                )
+            
+            self._current_startup_session = None
+        
+        # Clear startup session if stove stops without completing startup
+        elif not is_in_startup and not reached_stable and self._current_startup_session is not None:
+            _LOGGER.debug("Startup session interrupted (state: %s)", current_state)
+            self._current_startup_session = None
+
+        # === HEATING SESSION TRACKING ===
+        # Only track heating during stable operation, not startup
+        if is_actively_burning:
+            # Check if this is a new session or continuation
+            if self._current_heating_session is None:
+                # Start new heating session
+                self._current_heating_session = {
+                    "heatlevel": current_heatlevel,
+                    "start_time": current_time,
+                    "start_room_temp": current_room_temp,
+                    "start_learning_consumption": self._learning_consumption_total,  # Use learning tracker
+                    "target_temp": current_target_temp,
+                    "stable_start_time": current_time,
+                }
+                _LOGGER.debug("Started new heating session at HL%d", current_heatlevel)
+            
+            # Check if heatlevel changed
+            elif self._current_heating_session["heatlevel"] != current_heatlevel:
+                # Record the previous stable period if it was >15 minutes
+                session = self._current_heating_session
+                stable_duration = (current_time - session["stable_start_time"]).total_seconds()
+                
+                if stable_duration >= 900:  # 15 minutes
+                    # Record observation for the previous level
+                    consumption_change = self._learning_consumption_total - session["start_learning_consumption"]
+                    
+                    self._record_heating_observation(
+                        heatlevel=session["heatlevel"],
+                        duration_seconds=int(stable_duration),
+                        start_room_temp=session["start_room_temp"],
+                        end_room_temp=current_room_temp,
+                        target_temp=session["target_temp"],
+                        consumption_kg=consumption_change,
+                    )
+                
+                # Update session for new level
+                self._current_heating_session = {
+                    "heatlevel": current_heatlevel,
+                    "start_time": current_time,
+                    "start_room_temp": current_room_temp,
+                    "start_learning_consumption": self._learning_consumption_total,
+                    "target_temp": current_target_temp,
+                    "stable_start_time": current_time,
+                }
+                _LOGGER.debug("Heat level changed to HL%d, started new stable period", current_heatlevel)
+            
+            # Check if we should record a periodic snapshot (every 30 minutes at same level)
+            else:
+                session = self._current_heating_session
+                stable_duration = (current_time - session["stable_start_time"]).total_seconds()
+                
+                # Record every 30 minutes during stable operation
+                if stable_duration >= 1800:  # 30 minutes
+                    consumption_change = self._learning_consumption_total - session["start_learning_consumption"]
+                    
+                    self._record_heating_observation(
+                        heatlevel=session["heatlevel"],
+                        duration_seconds=int(stable_duration),
+                        start_room_temp=session["start_room_temp"],
+                        end_room_temp=current_room_temp,
+                        target_temp=session["target_temp"],
+                        consumption_kg=consumption_change,
+                    )
+                    
+                    # Reset the stable period tracking but keep session alive
+                    self._current_heating_session["stable_start_time"] = current_time
+                    self._current_heating_session["start_room_temp"] = current_room_temp
+                    self._current_heating_session["start_learning_consumption"] = self._learning_consumption_total
+                    
+                    _LOGGER.debug("Recorded periodic snapshot for HL%d after %.1f minutes", 
+                                session["heatlevel"], stable_duration / 60)
+            
+            # Close any cooling session (only relevant in temperature mode)
+            if self._current_cooling_session is not None and current_operation_mode == 1:
+                # Cooling period ended, record it
+                session = self._current_cooling_session
+                duration = (current_time - session["start_time"]).total_seconds()
+                
+                # Check if this was a manual start (app/HA change) or automatic restart
+                app_change = data.get("app_change_detected", False)
+                
+                _LOGGER.info(
+                    "Cooling session ending - duration: %.1f min, start_temp: %.1f°C, end_temp: %.1f°C, target: %.1f°C, app_change: %s",
+                    duration / 60,
+                    session["start_room_temp"],
+                    current_room_temp,
+                    session["target_temp"],
+                    app_change
+                )
+                
+                if duration >= 1800:  # 30 minutes minimum
+                    self._record_cooling_observation(
+                        duration_seconds=int(duration),
+                        start_room_temp=session["start_room_temp"],
+                        end_room_temp=current_room_temp,
+                        target_temp=session["target_temp"],
+                    )
+                    
+                    # Only record restart delta if this was AUTOMATIC (no user intervention)
+                    # Check:
+                    # 1. Still in temperature mode (user didn't switch to heat level)
+                    # 2. Target temp didn't change (user didn't adjust target during waiting)
+                    # 3. No external app change detected
+                    target_unchanged = session["target_temp"] == current_target_temp
+                    mode_unchanged = session.get("operation_mode") == current_operation_mode == 1
+                    
+                    if target_unchanged and mode_unchanged and not app_change:
+                        # Record restart delta (how far below target when restarted)
+                        restart_delta = session["target_temp"] - current_room_temp
+                        
+                        # Record using running average
+                        restart_data = self._learning_data["shutdown_restart_deltas"]["restart"]
+                        restart_data["total_delta"] += restart_delta
+                        restart_data["avg_delta"] = restart_data["total_delta"] / (restart_data["count"] + 1)
+                        restart_data["count"] += 1
+                        
+                        _LOGGER.info(
+                            "Recording AUTOMATIC restart delta: %.2f°C (avg=%.2f°C, count=%d)",
+                            restart_delta,
+                            restart_data["avg_delta"],
+                            restart_data["count"]
+                        )
+                        
+                        # Trigger save
+                        asyncio.create_task(self.async_save_pellet_data())
+                    else:
+                        reasons = []
+                        if not target_unchanged:
+                            reasons.append(f"target changed from {session['target_temp']}°C to {current_target_temp}°C")
+                        if not mode_unchanged:
+                            reasons.append(f"mode changed")
+                        if app_change:
+                            reasons.append("app change detected")
+                        
+                        _LOGGER.info("Restart was INTERRUPTED (%s), not recording restart delta", ", ".join(reasons))
+                else:
+                    _LOGGER.warning("Cooling session too short (%.1f min), not recording", duration / 60)
+                
+                self._current_cooling_session = None
+        
+        # === COOLING SESSION TRACKING ===
+        # Only track cooling/waiting in temperature mode
+        elif is_waiting and current_operation_mode == 1:
+            if self._current_cooling_session is None:
+                # Start new cooling session
+                self._current_cooling_session = {
+                    "start_time": current_time,
+                    "start_room_temp": current_room_temp,
+                    "target_temp": current_target_temp,
+                    "operation_mode": current_operation_mode,  # Track mode at start
+                }
+                
+                # Record shutdown delta if we just stopped (only if not interrupted)
+                if self._current_heating_session is not None:
+                    shutdown_delta = current_room_temp - current_target_temp
+                    
+                    # Check if shutdown was natural (not interrupted by user)
+                    heating_session_target = self._current_heating_session.get("target_temp")
+                    heating_session_mode = current_operation_mode  # Should be 1 for temp mode
+                    
+                    # Only record if:
+                    # - Still in temperature mode
+                    # - Target temp didn't change during the session
+                    if (heating_session_mode == 1 and 
+                        heating_session_target == current_target_temp):
+                        
+                        # Record using running average
+                        shutdown_data = self._learning_data["shutdown_restart_deltas"]["shutdown"]
+                        shutdown_data["total_delta"] += shutdown_delta
+                        shutdown_data["avg_delta"] = shutdown_data["total_delta"] / (shutdown_data["count"] + 1)
+                        shutdown_data["count"] += 1
+                        
+                        _LOGGER.info(
+                            "Stove entered waiting (AUTOMATIC), shutdown_delta=%.2f°C (avg=%.2f°C, count=%d)",
+                            shutdown_delta,
+                            shutdown_data["avg_delta"],
+                            shutdown_data["count"]
+                        )
+                        
+                        # Trigger save
+                        asyncio.create_task(self.async_save_pellet_data())
+                    else:
+                        _LOGGER.info("Stove entered waiting (USER INTERRUPTED), not recording shutdown_delta")
+                
+                _LOGGER.debug("Started cooling/waiting session")
+            
+            # Close any heating session
+            if self._current_heating_session is not None:
+                # Heating period ended, record it if stable >15 min
+                session = self._current_heating_session
+                stable_duration = (current_time - session["stable_start_time"]).total_seconds()
+                
+                if stable_duration >= 900:  # 15 minutes
+                    consumption_change = self._learning_consumption_total - session["start_learning_consumption"]
+                    
+                    self._record_heating_observation(
+                        heatlevel=session["heatlevel"],
+                        duration_seconds=int(stable_duration),
+                        start_room_temp=session["start_room_temp"],
+                        end_room_temp=current_room_temp,
+                        target_temp=session["target_temp"],
+                        consumption_kg=consumption_change,
+                    )
+                
+                self._current_heating_session = None
+
+        # === END OF OPERATION - RECORD FINAL SESSION ===
+        # If stove stops (not burning, not waiting), record any active session
+        if not is_burning and not is_waiting:
+            if self._current_heating_session is not None:
+                session = self._current_heating_session
+                stable_duration = (current_time - session["stable_start_time"]).total_seconds()
+                
+                if stable_duration >= 900:  # 15 minutes
+                    consumption_change = self._learning_consumption_total - session["start_learning_consumption"]
+                    
+                    self._record_heating_observation(
+                        heatlevel=session["heatlevel"],
+                        duration_seconds=int(stable_duration),
+                        start_room_temp=session["start_room_temp"],
+                        end_room_temp=current_room_temp,
+                        target_temp=session["target_temp"],
+                        consumption_kg=consumption_change,
+                    )
+                    
+                    _LOGGER.debug("Recorded final heating session before stop")
+                
+                self._current_heating_session = None
+            
+            if self._current_cooling_session is not None and current_operation_mode == 1:
+                session = self._current_cooling_session
+                duration = (current_time - session["start_time"]).total_seconds()
+                
+                if duration >= 1800:  # 30 minutes
+                    self._record_cooling_observation(
+                        duration_seconds=int(duration),
+                        start_room_temp=session["start_room_temp"],
+                        end_room_temp=current_room_temp,
+                        target_temp=session["target_temp"],
+                    )
+                    
+                    _LOGGER.debug("Recorded final cooling session before stop")
+                
+                self._current_cooling_session = None
+        
+        # Update last known state
+        self._last_learning_state = current_state
+        self._last_learning_heatlevel = current_heatlevel
+        self._last_learning_room_temp = current_room_temp
+        self._last_learning_timestamp = current_time
+
+    def _update_learning_consumption_tracker(self, data: dict[str, Any]) -> None:
+            """Update the learning consumption tracker with increments from consumption_day."""
+            if "consumption" not in data:
+                return
+            
+            current_consumption_day = data["consumption"].get("day", 0)
+            
+            # Initialize on first run
+            if self._last_consumption_day_for_learning is None:
+                self._last_consumption_day_for_learning = current_consumption_day
+                _LOGGER.debug("Initialized learning consumption tracker baseline: %.3f kg", current_consumption_day)
+                return
+            
+            # Calculate increment
+            increment = current_consumption_day - self._last_consumption_day_for_learning
+            
+            # Handle midnight reset (increment becomes negative)
+            if increment < 0:
+                # Midnight reset happened - use current value as increment
+                increment = current_consumption_day
+                _LOGGER.debug("Midnight reset detected in learning tracker - increment: %.3f kg", increment)
+            
+            # Only add positive increments
+            if increment > 0:
+                self._learning_consumption_total += increment
+                _LOGGER.debug(
+                    "Learning consumption updated: +%.3f kg (total: %.3f kg)",
+                    increment,
+                    self._learning_consumption_total
+                )
+            
+            # Update last known value
+            self._last_consumption_day_for_learning = current_consumption_day
+
+    def _get_heating_rate(
+        self,
+        heatlevel: int,
+        temp_delta: float,
+        outdoor_temp: float | None,
+    ) -> tuple[float, float]:
+        """
+        Get heating rate and consumption rate for given conditions.
+        Returns: (heating_rate_celsius_per_hour, consumption_rate_kg_per_hour)
+        """
+        # Default values if no learned data
+        defaults = {
+            1: (0.3, 0.35),
+            2: (0.6, 0.75),
+            3: (1.0, 1.2),
+        }
+        
+        # Get buckets
+        temp_delta_bucket = self._get_temp_delta_bucket(temp_delta)
+        outdoor_bucket = self._get_outdoor_temp_bucket(outdoor_temp) if outdoor_temp is not None else None
+        
+        # Try exact match first
+        key = (heatlevel, temp_delta_bucket, outdoor_bucket)
+        obs = self._learning_data["heating_observations"].get(key)
+        
+        if obs and obs["count"] >= 1:
+            return (obs["avg_heating_rate"], obs["avg_consumption_rate"])
+        
+        # Fallback: same heatlevel and temp_delta, any outdoor temp
+        if outdoor_bucket is not None:
+            matches = [
+                obs for k, obs in self._learning_data["heating_observations"].items()
+                if k[0] == heatlevel and k[1] == temp_delta_bucket and obs["count"] >= 1
+            ]
+            if matches:
+                avg_heating = sum(o["avg_heating_rate"] for o in matches) / len(matches)
+                avg_consumption = sum(o["avg_consumption_rate"] for o in matches) / len(matches)
+                return (avg_heating, avg_consumption)
+        
+        # Fallback: same heatlevel and outdoor, any temp_delta
+        if outdoor_bucket is not None:
+            matches = [
+                obs for k, obs in self._learning_data["heating_observations"].items()
+                if k[0] == heatlevel and k[2] == outdoor_bucket and obs["count"] >= 1
+            ]
+            if matches:
+                avg_heating = sum(o["avg_heating_rate"] for o in matches) / len(matches)
+                avg_consumption = sum(o["avg_consumption_rate"] for o in matches) / len(matches)
+                return (avg_heating, avg_consumption)
+        
+        # Fallback: same heatlevel only
+        matches = [
+            obs for k, obs in self._learning_data["heating_observations"].items()
+            if k[0] == heatlevel and obs["count"] >= 1
+        ]
+        if matches:
+            avg_heating = sum(o["avg_heating_rate"] for o in matches) / len(matches)
+            avg_consumption = sum(o["avg_consumption_rate"] for o in matches) / len(matches)
+            return (avg_heating, avg_consumption)
+        
+        # No learned data - use defaults
+        return defaults.get(heatlevel, (0.6, 0.75))
+    
+    def _get_cooling_rate(
+        self,
+        start_room_temp: float,
+        outdoor_temp: float | None,
+    ) -> float:
+        """
+        Get cooling rate for given conditions.
+        Returns: cooling_rate_celsius_per_hour
+        """
+        default_cooling_rate = 0.3
+        
+        # Get buckets
+        start_temp_bucket = int(math.floor(start_room_temp / 2) * 2)
+        outdoor_bucket = self._get_outdoor_temp_bucket(outdoor_temp) if outdoor_temp is not None else None
+        
+        # Try exact match
+        key = (outdoor_bucket, start_temp_bucket)
+        obs = self._learning_data["cooling_observations"].get(key)
+        
+        if obs and obs["count"] >= 1:
+            return obs["avg_cooling_rate"]
+        
+        # Fallback: same outdoor temp, any start temp
+        if outdoor_bucket is not None:
+            matches = [
+                obs for k, obs in self._learning_data["cooling_observations"].items()
+                if k[0] == outdoor_bucket and obs["count"] >= 1
+            ]
+            if matches:
+                return sum(o["avg_cooling_rate"] for o in matches) / len(matches)
+        
+        # Fallback: any outdoor, same start temp
+        matches = [
+            obs for k, obs in self._learning_data["cooling_observations"].items()
+            if k[1] == start_temp_bucket and obs["count"] >= 1
+        ]
+        if matches:
+            return sum(o["avg_cooling_rate"] for o in matches) / len(matches)
+        
+        # Fallback: average all cooling observations
+        all_obs = [obs for obs in self._learning_data["cooling_observations"].values() if obs["count"] >= 1]
+        if all_obs:
+            return sum(o["avg_cooling_rate"] for o in all_obs) / len(all_obs)
+        
+        # No learned data
+        return default_cooling_rate
+    
+    def _get_learning_status(self) -> dict[str, Any]:
+        """Get status of learning data collection."""
+        # Calculate hours of observation per heat level
+        heatlevel_hours = {1: 0.0, 2: 0.0, 3: 0.0}
+        
+        for key, obs in self._learning_data["heating_observations"].items():
+            heatlevel = key[0]
+            # Estimate hours from count (assuming average 30 min per observation)
+            heatlevel_hours[heatlevel] += (obs["count"] * 0.5)
+        
+        # Count waiting periods
+        waiting_periods = sum(
+            obs["count"] for obs in self._learning_data["cooling_observations"].values()
+        )
+        
+        # Check if data is recent (within 60 days)
+        recent_data = False
+        now = datetime.now()
+        
+        for obs in self._learning_data["heating_observations"].values():
+            if (now - obs["last_updated"]).days <= 60:
+                recent_data = True
+                break
+        
+        if not recent_data:
+            for obs in self._learning_data["cooling_observations"].values():
+                if (now - obs["last_updated"]).days <= 60:
+                    recent_data = True
+                    break
+        
+        # Determine sufficiency
+        sufficient_data = (
+            heatlevel_hours[1] >= 0 and
+            heatlevel_hours[2] >= 0 and
+            heatlevel_hours[3] >= 0 and
+            waiting_periods >= 0 and
+            recent_data
+        )
+        
+        return {
+            "heatlevel_1_hours": round(heatlevel_hours[1], 1),
+            "heatlevel_2_hours": round(heatlevel_hours[2], 1),
+            "heatlevel_3_hours": round(heatlevel_hours[3], 1),
+            "waiting_periods_observed": waiting_periods,
+            "recent_data": recent_data,
+            "sufficient_data": sufficient_data,
+            "total_heating_observations": len(self._learning_data["heating_observations"]),
+            "total_cooling_observations": len(self._learning_data["cooling_observations"]),
+        }
+    
+    def _calculate_confidence_level(
+        self,
+        learning_status: dict[str, Any],
+        operation_mode: int,
+        cycles_predicted: int,
+    ) -> str:
+        """Calculate confidence level for prediction."""
+        # High accuracy criteria
+        if (learning_status["sufficient_data"] and
+            learning_status["recent_data"] and
+            operation_mode == 0 and  # Heat level mode
+            cycles_predicted < 3):
+            return "high"
+        
+        # Low accuracy criteria
+        if (not learning_status["sufficient_data"] or
+            cycles_predicted >= 8 or
+            (self._external_temp_sensor and self._get_external_temperature() is None)):
+            return "low"
+        
+        # Medium accuracy (everything else)
+        return "medium"
+
+    def predict_pellet_depletion(self) -> dict[str, Any] | None:
+        """
+        Predict when pellets will run out.
+        Returns dict with prediction data or None if insufficient data/not applicable.
+        """
+        if not self.data or "operating" not in self.data or "status" not in self.data:
+            return None
+        
+        current_state = self.data["operating"].get("state")
+        current_operation_mode = self.data["status"].get("operation_mode")
+        
+        # Only predict in heat level mode (0) or temperature mode (1)
+        if current_operation_mode not in [0, 1]:
+            return None
+        
+        # Don't predict when stove is off (not waiting, just off)
+        if current_state not in ["2", "4", "5", "6", "32"]:
+            return None
+        
+        # Get current conditions
+        pellets_remaining = self.data.get("pellets", {}).get("amount", 0)
+        
+        if pellets_remaining <= 0:
+            return {
+                "time_remaining_seconds": 0,
+                "time_remaining_formatted": "0h 0m",
+                "depletion_datetime": datetime.now(),
+                "confidence": "high",
+                "status": "empty",
+            }
+        
+        current_room_temp = self.data["operating"].get("boiler_temp", 20)
+        target_temp = self.data["operating"].get("boiler_ref", 20)
+        current_heatlevel = self.data["operating"].get("heatlevel", 2)
+        outdoor_temp = self._get_external_temperature()
+        
+        # Get learned deltas
+        shutdown_delta = self._learning_data["shutdown_restart_deltas"]["shutdown"]["avg_delta"]
+        restart_delta = self._learning_data["shutdown_restart_deltas"]["restart"]["avg_delta"]
+        
+        # Get learning status
+        learning_status = self._get_learning_status()
+        
+        # Check if we have minimum data
+        if not learning_status["sufficient_data"]:
+            return {
+                "status": "insufficient_data",
+                "learning_status": learning_status,
+            }
+        
+        # === HEAT LEVEL MODE (Simple) ===
+        if current_operation_mode == 0:
+            # Get consumption rate for current heat level
+            _, consumption_rate = self._get_heating_rate(
+                heatlevel=current_heatlevel,
+                temp_delta=0,  # Not relevant in heat level mode
+                outdoor_temp=outdoor_temp,
+            )
+            
+            if consumption_rate <= 0:
+                return {"status": "insufficient_data", "learning_status": learning_status}
+            
+            # Account for current state - if in startup, that consumption is already happening
+            pellets_for_calculation = pellets_remaining
+            startup_consumption = self._learning_data["startup_observations"]["avg_consumption"]
+            
+            # If stove is OFF or just started, account for startup consumption
+            if current_state not in ["5", "32"]:
+                # Will need startup before steady-state operation
+                pellets_for_calculation -= startup_consumption
+                if pellets_for_calculation <= 0:
+                    # Not enough pellets to complete startup
+                    return {
+                        "time_remaining_seconds": 0,
+                        "time_remaining_formatted": "0h 0m",
+                        "depletion_datetime": datetime.now(),
+                        "confidence": "high",
+                        "status": "empty",
+                    }
+            
+            # Simple calculation
+            time_remaining_hours = pellets_for_calculation / consumption_rate
+            time_remaining_seconds = int(time_remaining_hours * 3600)
+            
+            depletion_datetime = datetime.now() + timedelta(seconds=time_remaining_seconds)
+            
+            confidence = self._calculate_confidence_level(
+                learning_status=learning_status,
+                operation_mode=0,
+                cycles_predicted=0,
+            )
+            
+            return {
+                "time_remaining_seconds": time_remaining_seconds,
+                "time_remaining_formatted": self._format_time_remaining(time_remaining_seconds),
+                "depletion_datetime": depletion_datetime,
+                "confidence": confidence,
+                "status": "ok",
+                "mode": "heatlevel",
+                "current_heatlevel": current_heatlevel,
+                "consumption_rate": round(consumption_rate, 2),
+                "learning_status": learning_status,
+            }
+        
+        # === TEMPERATURE MODE (Complex with cycles) ===
+        total_time_seconds = 0
+        cycles_count = 0
+        pellets_left = pellets_remaining
+        sim_room_temp = current_room_temp
+        sim_state = "burning" if current_state in ["5", "32"] else "waiting"
+        sim_heatlevel = current_heatlevel
+        time_at_current_level = 0
+        
+        # Track if we're already at level 1 for shutdown check
+        time_at_level_1 = 0
+        if current_heatlevel == 1 and current_state in ["5", "32"]:
+            # Assume we've been at level 1 for at least 10 minutes (conservative)
+            time_at_level_1 = 10 * 60
+        
+        max_iterations = 100  # Safety limit
+        iteration = 0
+        startup_consumption = self._learning_data["startup_observations"]["avg_consumption"]
+        startup_duration = self._learning_data["startup_observations"]["avg_duration"]
+        
+        while pellets_left > 0 and iteration < max_iterations:
+            iteration += 1
+            
+            # === BURNING PHASE ===
+            if sim_state == "burning":
+                cycles_count += 1
+                
+                # Account for startup consumption at beginning of each cycle
+                pellets_left -= startup_consumption
+                total_time_seconds += startup_duration
+                
+                if pellets_left <= 0:
+                    # Ran out during startup
+                    break
+                
+                # Simulate burning until next event
+                while pellets_left > 0:
+                    temp_delta = target_temp - sim_room_temp
+                    
+                    # Get heating and consumption rates
+                    heating_rate, consumption_rate = self._get_heating_rate(
+                        heatlevel=sim_heatlevel,
+                        temp_delta=temp_delta,
+                        outdoor_temp=outdoor_temp,
+                    )
+                    
+                    if consumption_rate <= 0:
+                        # Can't predict without consumption data
+                        return {"status": "insufficient_data", "learning_status": learning_status}
+                    
+                    # Calculate time to next event
+                    
+                    # Event 1: Check if level change needed after 10 minutes
+                    if time_at_current_level >= 10 * 60:
+                        # Predict temp after 10 minutes at current level
+                        temp_in_10min = sim_room_temp + (heating_rate * 10 / 60)
+                        temp_delta_in_10min = target_temp - temp_in_10min
+                        
+                        if temp_delta_in_10min > 0.5 and sim_heatlevel < 3:
+                            # Need to increase level
+                            time_to_event = 10 * 60
+                            next_event = "increase_level"
+                        elif temp_delta_in_10min < -0.5 and sim_heatlevel > 1:
+                            # Need to decrease level
+                            time_to_event = 10 * 60
+                            next_event = "decrease_level"
+                        else:
+                            # No level change, check for shutdown
+                            next_event = None
+                    else:
+                        # Must wait until 10 minutes at current level
+                        time_to_event = (10 * 60) - time_at_current_level
+                        next_event = "level_change_check"
+                    
+                    # Event 2: Shutdown temperature reached (only at level 1 after 10 min)
+                    if heating_rate > 0.05:  # Room is heating
+                        shutdown_temp = target_temp + shutdown_delta
+                        temp_to_gain = shutdown_temp - sim_room_temp
+                        
+                        if temp_to_gain > 0:
+                            time_to_shutdown_seconds = (temp_to_gain / heating_rate) * 3600
+                            
+                            # Only valid if at level 1 for 10+ minutes
+                            if sim_heatlevel == 1 and time_at_level_1 >= 10 * 60:
+                                if next_event is None or time_to_shutdown_seconds < time_to_event:
+                                    time_to_event = time_to_shutdown_seconds
+                                    next_event = "shutdown"
+                    else:
+                        # Not heating (or cooling) - continuous burn, no shutdown
+                        # Check if continuous burn condition
+                        if heating_rate <= 0.05 and next_event is None:
+                            # Will never reach shutdown - burns continuously
+                            time_to_empty_seconds = (pellets_left / consumption_rate) * 3600
+                            time_to_event = time_to_empty_seconds
+                            next_event = "pellets_empty"
+                    
+                    # Event 3: Pellets run out
+                    time_to_empty_seconds = (pellets_left / consumption_rate) * 3600
+                    
+                    if next_event is None or time_to_empty_seconds < time_to_event:
+                        time_to_event = time_to_empty_seconds
+                        next_event = "pellets_empty"
+                    
+                    # Advance simulation to next event
+                    time_to_event = max(0, time_to_event)
+                    
+                    # Update state
+                    sim_room_temp += (heating_rate * time_to_event / 3600)
+                    pellets_consumed = consumption_rate * (time_to_event / 3600)
+                    pellets_left -= pellets_consumed
+                    pellets_left = max(0, pellets_left)
+                    
+                    total_time_seconds += time_to_event
+                    time_at_current_level += time_to_event
+                    
+                    if sim_heatlevel == 1:
+                        time_at_level_1 += time_to_event
+                    
+                    # Handle event
+                    if next_event == "pellets_empty":
+                        # Done!
+                        break
+                    
+                    elif next_event == "increase_level":
+                        sim_heatlevel = min(3, sim_heatlevel + 1)
+                        time_at_current_level = 0
+                        if sim_heatlevel == 1:
+                            time_at_level_1 = 0
+                        continue
+                    
+                    elif next_event == "decrease_level":
+                        sim_heatlevel = max(1, sim_heatlevel - 1)
+                        time_at_current_level = 0
+                        if sim_heatlevel == 1:
+                            time_at_level_1 = 0
+                        continue
+                    
+                    elif next_event == "level_change_check":
+                        # Just reached 10 minutes, check again
+                        continue
+                    
+                    elif next_event == "shutdown":
+                        # Enter waiting period
+                        sim_state = "waiting"
+                        sim_heatlevel = 1  # Will restart at level 1
+                        time_at_current_level = 0
+                        time_at_level_1 = 0
+                        break
+                
+                # If pellets empty, exit main loop
+                if pellets_left <= 0:
+                    break
+            
+            # === WAITING PHASE ===
+            if sim_state == "waiting":
+                # Get cooling rate
+                cooling_rate = self._get_cooling_rate(
+                    start_room_temp=sim_room_temp,
+                    outdoor_temp=outdoor_temp,
+                )
+                
+                # Calculate time to restart
+                restart_temp = target_temp - restart_delta
+                temp_to_lose = sim_room_temp - restart_temp
+                
+                if temp_to_lose > 0 and cooling_rate > 0:
+                    wait_time_seconds = (temp_to_lose / cooling_rate) * 3600
+                else:
+                    # Default to 2.5 hours if can't calculate
+                    wait_time_seconds = 2.5 * 3600
+                
+                # Update state
+                sim_room_temp -= (cooling_rate * wait_time_seconds / 3600)
+                total_time_seconds += wait_time_seconds
+                
+                # No consumption during waiting
+                
+                # After waiting, restart at level 1
+                sim_state = "burning"
+                sim_heatlevel = 1
+                time_at_current_level = 0
+                time_at_level_1 = 0
+        
+        # Format results
+        depletion_datetime = datetime.now() + timedelta(seconds=total_time_seconds)
+        
+        confidence = self._calculate_confidence_level(
+            learning_status=learning_status,
+            operation_mode=1,
+            cycles_predicted=cycles_count,
+        )
+        
+        return {
+            "time_remaining_seconds": int(total_time_seconds),
+            "time_remaining_formatted": self._format_time_remaining(int(total_time_seconds)),
+            "depletion_datetime": depletion_datetime,
+            "confidence": confidence,
+            "status": "ok",
+            "mode": "temperature",
+            "cycles_remaining": cycles_count,
+            "current_phase": "burning" if current_state in ["5", "32"] else "waiting",
+            "learning_status": learning_status,
+            "shutdown_delta": round(shutdown_delta, 1),
+            "restart_delta": round(restart_delta, 1),
+        }
+    
+    def _format_time_remaining(self, seconds: int) -> str:
+        """Format time remaining as 'Xh Ym' or 'Xd Yh' if >24 hours."""
+        if seconds <= 0:
+            return "0h 0m"
+        
+        days = seconds // 86400
+        hours = (seconds % 86400) // 3600
+        minutes = (seconds % 3600) // 60
+        
+        if days > 0:
+            return f"{days}d {hours}h"
+        else:
+            return f"{hours}h {minutes}m"
+
     async def async_save_pellet_data(self) -> None:
         """Save pellet tracking data to storage."""
         try:
@@ -1407,6 +2620,29 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "high_smoke_duration_threshold": self._high_smoke_duration_threshold,
                 "low_wood_temp_threshold": self._low_wood_temp_threshold,
                 "low_wood_duration_threshold": self._low_wood_duration_threshold,
+                # Save learning data (convert tuple keys to strings and datetime to isoformat for JSON compatibility)
+                "learning_data": {
+                    "heating_observations": {
+                        str(k): {
+                            **v,
+                            "last_updated": v["last_updated"].isoformat() if isinstance(v.get("last_updated"), datetime) else str(v.get("last_updated", ""))
+                        } for k, v in self._learning_data["heating_observations"].items()
+                    },
+                    "cooling_observations": {
+                        str(k): {
+                            **v,
+                            "last_updated": v["last_updated"].isoformat() if isinstance(v.get("last_updated"), datetime) else str(v.get("last_updated", ""))
+                        } for k, v in self._learning_data["cooling_observations"].items()
+                    },
+                    "startup_observations": self._learning_data["startup_observations"],
+                    "shutdown_restart_deltas": self._learning_data["shutdown_restart_deltas"],
+                },
+                "external_temp_sensor": self._external_temp_sensor,
+
+                # Save learning consumption tracker
+                "learning_consumption_total": self._learning_consumption_total,
+                "last_consumption_day_for_learning": self._last_consumption_day_for_learning,
+
             }
             await self._store.async_save(data)
             _LOGGER.debug("Saved pellet data to storage")

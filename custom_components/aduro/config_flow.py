@@ -20,6 +20,7 @@ from .const import (
     CONF_STOVE_MODEL,
     CONF_STOVE_IP,
     CONF_EXTERNAL_TEMP_SENSOR,
+    CONF_WEATHER_FORECAST_SENSOR,
     DEFAULT_STOVE_MODEL,
     STOVE_MODELS,
 )
@@ -147,7 +148,25 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                         user_input[CONF_EXTERNAL_TEMP_SENSOR] = external_temp_sensor
                 else:
                     user_input.pop(CONF_EXTERNAL_TEMP_SENSOR, None)
-                
+
+                # Validate weather forecast sensor if provided
+                weather_forecast_sensor = user_input.get(CONF_WEATHER_FORECAST_SENSOR, "").strip()
+                if weather_forecast_sensor:
+                    # Check if entity exists and is a weather entity
+                    state = self.hass.states.get(weather_forecast_sensor)
+                    if state is None:
+                        _LOGGER.warning("Weather forecast sensor not found: %s", weather_forecast_sensor)
+                        errors[CONF_WEATHER_FORECAST_SENSOR] = "sensor_not_found"
+                    elif not weather_forecast_sensor.startswith("weather."):
+                        _LOGGER.warning("Entity is not a weather entity: %s", weather_forecast_sensor)
+                        errors[CONF_WEATHER_FORECAST_SENSOR] = "not_weather_entity"
+                    else:
+                        # Entity exists and is a weather entity - accept it
+                        user_input[CONF_WEATHER_FORECAST_SENSOR] = weather_forecast_sensor
+                        _LOGGER.info("Configured weather forecast sensor: %s", weather_forecast_sensor)
+                else:
+                    user_input.pop(CONF_WEATHER_FORECAST_SENSOR, None)
+
                 if not errors:
                     # Merge with existing data, preserving serial and PIN
                     new_data = {
@@ -167,6 +186,12 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                     else:
                         new_data.pop(CONF_EXTERNAL_TEMP_SENSOR, None)
                     
+                    # Handle weather forecast sensor: add if present, remove if empty
+                    if CONF_WEATHER_FORECAST_SENSOR in user_input:
+                        new_data[CONF_WEATHER_FORECAST_SENSOR] = user_input[CONF_WEATHER_FORECAST_SENSOR]
+                    else:
+                        new_data.pop(CONF_WEATHER_FORECAST_SENSOR, None)
+                    
                     _LOGGER.info(
                         "Updating entry - Model: %s, IP: %s, External Temp Sensor: %s",
                         new_data.get(CONF_STOVE_MODEL),
@@ -183,6 +208,7 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                     # Update coordinator with new external temp sensor
                     coordinator = self.hass.data[DOMAIN][self.config_entry.entry_id]
                     coordinator._external_temp_sensor = new_data.get(CONF_EXTERNAL_TEMP_SENSOR)
+                    coordinator._weather_forecast_sensor = new_data.get(CONF_WEATHER_FORECAST_SENSOR)
                     
                     # Save the configuration
                     await coordinator.async_save_pellet_data()
@@ -196,6 +222,12 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
         current_model = self.config_entry.data.get(CONF_STOVE_MODEL, DEFAULT_STOVE_MODEL)
         current_ip = self.config_entry.data.get(CONF_STOVE_IP, "")
         current_external_temp = self.config_entry.data.get(CONF_EXTERNAL_TEMP_SENSOR, "")
+
+        # Get current values
+        current_model = self.config_entry.data.get(CONF_STOVE_MODEL, DEFAULT_STOVE_MODEL)
+        current_ip = self.config_entry.data.get(CONF_STOVE_IP, "")
+        current_external_temp = self.config_entry.data.get(CONF_EXTERNAL_TEMP_SENSOR, "")
+        current_weather_forecast = self.config_entry.data.get(CONF_WEATHER_FORECAST_SENSOR, "")
 
         options_schema = vol.Schema(
             {
@@ -211,6 +243,11 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                         domain=["sensor", "weather"],
                     )
                 ),
+                vol.Optional(CONF_WEATHER_FORECAST_SENSOR, description={"suggested_value": current_weather_forecast}): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["weather"],
+                    )
+                ),
             }
         )
 
@@ -221,6 +258,7 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
             description_placeholders={
                 "model_info": "Update your Aduro stove model",
                 "ip_info": "Optional: Enter a fixed IP address for your stove. Leave empty for automatic discovery.",
-                "external_temp_info": "Optional: Select an external temperature sensor for improved pellet depletion predictions."
+                "external_temp_info": "Optional: Select an external temperature sensor for improved pellet depletion predictions.",
+                "weather_forecast_info": "Optional: Select a weather forecast entity for advanced predictions using forecasted temperatures."
             },
         )

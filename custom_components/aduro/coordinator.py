@@ -29,6 +29,7 @@ from .const import (
     CONF_STOVE_MODEL,
     CONF_STOVE_IP,
     CONF_EXTERNAL_TEMP_SENSOR,
+    CONF_WEATHER_FORECAST_SENSOR,
     DEFAULT_SCAN_INTERVAL,
     UPDATE_INTERVAL_FAST,
     UPDATE_INTERVAL_NORMAL,
@@ -127,9 +128,27 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._low_wood_alert_sent = False
 
         # Learning system for pellet depletion prediction
+        # VERSION 2 structure - separate consumption from heating observations
         self._learning_data = {
-            "heating_observations": {},
+            "heating_observations": {},  # (heatlevel, temp_delta, outdoor) -> heating_rate only
             "cooling_observations": {},
+            "consumption_observations": {  # NEW: heatlevel -> consumption_rate
+                1: {
+                    "count": 0,
+                    "total_consumption_rate": 0.0,
+                    "avg_consumption_rate": 0.35,  # Default kg/h
+                },
+                2: {
+                    "count": 0,
+                    "total_consumption_rate": 0.0,
+                    "avg_consumption_rate": 0.75,  # Default kg/h
+                },
+                3: {
+                    "count": 0,
+                    "total_consumption_rate": 0.0,
+                    "avg_consumption_rate": 1.2,  # Default kg/h
+                },
+            },
             "startup_observations": {
                 "count": 0,
                 "total_consumption": 0.0,
@@ -166,6 +185,14 @@ class AduroCoordinator(DataUpdateCoordinator):
         # External temperature sensor configuration
         self._external_temp_sensor = entry.data.get(CONF_EXTERNAL_TEMP_SENSOR)
         self._external_temp_value = None
+
+        # Weather forecast sensor configuration
+        self._weather_forecast_sensor = entry.data.get(CONF_WEATHER_FORECAST_SENSOR)
+
+        # Weather forecast cache
+        self._forecast_data: list[dict[str, Any]] = []
+        self._forecast_last_updated: datetime | None = None
+        self._forecast_update_interval = timedelta(hours=1)
 
         # Timer tracking
         self._timer_startup_1_started: datetime | None = None
@@ -226,6 +253,9 @@ class AduroCoordinator(DataUpdateCoordinator):
             if self.stove_ip is None or self._should_rediscover():
                 _LOGGER.debug("Attempting stove discovery")
                 await self._async_discover_stove()
+            
+            # Update weather forecast if needed (once per hour)
+            await self._async_update_forecast_cache()
             
             # Fetch all data
             data = {}
@@ -1430,6 +1460,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                     "shutdown_restart_deltas": {}
                 })
                 
+                
                 _LOGGER.info("Found %d heating observations in file", 
                            len(loaded_learning_data.get("heating_observations", {})))
                 _LOGGER.info("Found %d cooling observations in file", 
@@ -1500,22 +1531,47 @@ class AduroCoordinator(DataUpdateCoordinator):
                     }
                     _LOGGER.debug("No shutdown_restart_deltas found, using defaults")
                 
+                # Load consumption observations
+                loaded_consumption = loaded_learning_data.get("consumption_observations", {})
+                
+                # Ensure all heatlevels exist with proper structure
+                # Note: JSON saves integer keys as strings, so check both
+                consumption_obs = {}
+                for hl in [1, 2, 3]:
+                    # Try both integer and string keys
+                    loaded_obs = loaded_consumption.get(hl) or loaded_consumption.get(str(hl))
+                    
+                    if loaded_obs and isinstance(loaded_obs, dict):
+                        # Use loaded data (convert to integer key)
+                        consumption_obs[hl] = loaded_obs
+                    else:
+                        # Initialize with defaults
+                        consumption_obs[hl] = {
+                            "count": 0,
+                            "total_consumption_rate": 0.0,
+                            "avg_consumption_rate": {1: 0.35, 2: 0.75, 3: 1.2}[hl],
+                        }
+                
                 self._learning_data = {
                     "heating_observations": heating_obs,
                     "cooling_observations": cooling_obs,
+                    "consumption_observations": consumption_obs,
                     "startup_observations": loaded_learning_data.get("startup_observations", {
                         "count": 0,
-                        "total_consumption": 0.0,
+                        "total_consumption_rate": 0.0,
                         "avg_consumption": 0.15,
-                        "avg_duration": 900,
+                        "avg_duration": 360,
                     }),
                     "shutdown_restart_deltas": shutdown_restart_deltas
                 }
                 
                 _LOGGER.info(
-                    "=== Loaded learning data: %d heating obs, %d cooling obs ===",
+                    "=== Loaded learning data: %d heating obs, %d cooling obs, consumption HL1=%d HL2=%d HL3=%d ===",
                     len(self._learning_data["heating_observations"]),
-                    len(self._learning_data["cooling_observations"])
+                    len(self._learning_data["cooling_observations"]),
+                    consumption_obs[1]["count"],
+                    consumption_obs[2]["count"],
+                    consumption_obs[3]["count"]
                 )
 
                 _LOGGER.info(
@@ -1533,13 +1589,21 @@ class AduroCoordinator(DataUpdateCoordinator):
                     self._learning_data["shutdown_restart_deltas"]["restart"]["avg_delta"]
                 )
                 
-                # Log sample observations
-                for i, (key, obs) in enumerate(list(self._learning_data["heating_observations"].items())[:3]):
-                    _LOGGER.info("Sample heating obs #%d: key=%s, count=%d, heating_rate=%.2f, consumption_rate=%.2f", 
-                                i+1, key, obs.get("count", 0), obs.get("avg_heating_rate", 0), obs.get("avg_consumption_rate", 0))
-                
+                # Log consumption observations
+                for hl in [1, 2, 3]:
+                    cons_obs = self._learning_data["consumption_observations"].get(hl, {})
+                    _LOGGER.info(
+                        "Loaded consumption HL%d: count=%d, avg=%.3f kg/h",
+                        hl,
+                        cons_obs.get("count", 0),
+                        cons_obs.get("avg_consumption_rate", 0)
+                    )
+
                 # Load external temperature sensor config
                 self._external_temp_sensor = data.get("external_temp_sensor")
+
+                # Load weather forecast sensor config
+                self._weather_forecast_sensor = data.get("weather_forecast_sensor")
 
                 # Load learning consumption tracker
                 self._learning_consumption_total = data.get("learning_consumption_total", 0.0)
@@ -1605,7 +1669,112 @@ class AduroCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Failed to get external temperature: %s", err)
         
         return None
-    
+
+    def _get_forecast_temp_at_time(
+        self, 
+        forecast_data: list[dict], 
+        target_time: datetime
+    ) -> float | None:
+        """
+        Get forecasted temperature at a specific time.
+        Uses the closest forecast entry within 1 hour.
+        """
+        if not forecast_data:
+            return None
+        
+        # Find closest forecast entry
+        closest = min(
+            forecast_data, 
+            key=lambda x: abs((x["datetime"] - target_time).total_seconds())
+        )
+        
+        # Only use if within 1.5 hours (tolerance for hourly data)
+        time_diff = abs((closest["datetime"] - target_time).total_seconds())
+        if time_diff <= 5400:  # 1.5 hours in seconds
+            return closest["temperature"]
+        
+        return None
+
+    async def _async_update_forecast_cache(self) -> None:
+            """Update the weather forecast cache if needed (once per hour)."""
+            if not self._weather_forecast_sensor:
+                return
+            
+            # Check if we need to update
+            now = datetime.now()
+            if (self._forecast_last_updated is not None and 
+                (now - self._forecast_last_updated) < self._forecast_update_interval):
+                # Cache is still fresh
+                return
+            
+            _LOGGER.debug("Updating weather forecast cache from %s", self._weather_forecast_sensor)
+            
+            try:
+                # Call the weather.get_forecasts service
+                response = await self.hass.services.async_call(
+                    "weather",
+                    "get_forecasts",
+                    {
+                        "entity_id": self._weather_forecast_sensor,
+                        "type": "hourly",
+                    },
+                    blocking=True,
+                    return_response=True,
+                )
+                
+                # Response format: {entity_id: {"forecast": [...]}}
+                if not response or self._weather_forecast_sensor not in response:
+                    _LOGGER.warning("No forecast data in response from %s", self._weather_forecast_sensor)
+                    return
+                
+                forecast_data = response[self._weather_forecast_sensor]
+                forecast = forecast_data.get("forecast", [])
+                
+                if not forecast:
+                    _LOGGER.warning("Empty forecast from %s", self._weather_forecast_sensor)
+                    return
+                
+                # Normalize forecast data
+                normalized = []
+                
+                for i, entry in enumerate(forecast):
+                    if "datetime" not in entry or "temperature" not in entry:
+                        continue
+                    
+                    dt = entry["datetime"]
+                    if isinstance(dt, str):
+                        try:
+                            dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+                        except ValueError:
+                            _LOGGER.debug("Could not parse datetime: %s", dt)
+                            continue
+                    
+                    temp = entry.get("temperature")
+                    if temp is None:
+                        continue
+                    
+                    # Add to normalized list
+                    normalized.append({
+                        "datetime": dt.replace(tzinfo=None),
+                        "temperature": temp,
+                    })
+                
+                if normalized:
+                    self._forecast_data = normalized
+                    self._forecast_last_updated = now
+                    
+                    _LOGGER.info(
+                        "Updated weather forecast cache: %d hourly entries from %s to %s",
+                        len(normalized),
+                        normalized[0]["datetime"].strftime("%Y-%m-%d %H:%M"),
+                        normalized[-1]["datetime"].strftime("%Y-%m-%d %H:%M")
+                    )
+                else:
+                    _LOGGER.warning("No valid forecast entries parsed from %s", self._weather_forecast_sensor)
+                
+            except Exception as err:
+                _LOGGER.warning("Failed to update forecast cache from %s: %s", self._weather_forecast_sensor, err)
+
     def _record_heating_observation(
         self,
         heatlevel: int,
@@ -1629,7 +1798,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         outdoor_temp = self._get_external_temperature()
         outdoor_bucket = self._get_outdoor_temp_bucket(outdoor_temp) if outdoor_temp is not None else None
         
-        # Create key
+        # === HEATING RATE OBSERVATION (keeps outdoor temp dependency) ===
         key = (heatlevel, temp_delta_bucket, outdoor_bucket)
         
         # Update or create observation
@@ -1637,26 +1806,42 @@ class AduroCoordinator(DataUpdateCoordinator):
             self._learning_data["heating_observations"][key] = {
                 "count": 0,
                 "total_heating_rate": 0.0,
-                "total_consumption_rate": 0.0,
                 "avg_heating_rate": 0.0,
-                "avg_consumption_rate": 0.0,
                 "last_updated": datetime.now(),
             }
         
         obs = self._learning_data["heating_observations"][key]
         
-        # Update running average
+        # Update running average for heating rate only
         obs["total_heating_rate"] += heating_rate
-        obs["total_consumption_rate"] += consumption_rate
         obs["avg_heating_rate"] = obs["total_heating_rate"] / (obs["count"] + 1)
-        obs["avg_consumption_rate"] = obs["total_consumption_rate"] / (obs["count"] + 1)
         obs["count"] += 1
         obs["last_updated"] = datetime.now()
         
         _LOGGER.info(
             "Recorded heating observation: HL=%d, temp_delta=%.1f°C, outdoor=%s°C, "
-            "heating_rate=%.2f°C/h, consumption_rate=%.2f kg/h (count=%d)",
-            heatlevel, temp_delta_bucket, outdoor_bucket, heating_rate, consumption_rate, obs["count"]
+            "heating_rate=%.2f°C/h (count=%d)",
+            heatlevel, temp_delta_bucket, outdoor_bucket, heating_rate, obs["count"]
+        )
+        
+        # === CONSUMPTION RATE OBSERVATION (NO outdoor temp dependency) ===
+        if heatlevel not in self._learning_data["consumption_observations"]:
+            self._learning_data["consumption_observations"][heatlevel] = {
+                "count": 0,
+                "total_consumption_rate": 0.0,
+                "avg_consumption_rate": {1: 0.35, 2: 0.75, 3: 1.2}.get(heatlevel, 0.75),
+            }
+        
+        cons_obs = self._learning_data["consumption_observations"][heatlevel]
+        
+        # Update running average for consumption rate
+        cons_obs["total_consumption_rate"] += consumption_rate
+        cons_obs["avg_consumption_rate"] = cons_obs["total_consumption_rate"] / (cons_obs["count"] + 1)
+        cons_obs["count"] += 1
+        
+        _LOGGER.info(
+            "Recorded consumption observation: HL=%d, consumption_rate=%.3f kg/h (count=%d, avg=%.3f kg/h)",
+            heatlevel, consumption_rate, cons_obs["count"], cons_obs["avg_consumption_rate"]
         )
 
         # Trigger immediate save
@@ -2098,16 +2283,16 @@ class AduroCoordinator(DataUpdateCoordinator):
         heatlevel: int,
         temp_delta: float,
         outdoor_temp: float | None,
-    ) -> tuple[float, float]:
+    ) -> float:
         """
-        Get heating rate and consumption rate for given conditions.
-        Returns: (heating_rate_celsius_per_hour, consumption_rate_kg_per_hour)
+        Get heating rate for given conditions (ONLY heating rate, not consumption).
+        Returns: heating_rate_celsius_per_hour
         """
-        # Default values if no learned data
+        # Default heating rates if no learned data
         defaults = {
-            1: (0.3, 0.35),
-            2: (0.6, 0.75),
-            3: (1.0, 1.2),
+            1: 0.3,
+            2: 0.6,
+            3: 1.0,
         }
         
         # Get buckets
@@ -2119,7 +2304,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         obs = self._learning_data["heating_observations"].get(key)
         
         if obs and obs["count"] >= 1:
-            return (obs["avg_heating_rate"], obs["avg_consumption_rate"])
+            return obs["avg_heating_rate"]
         
         # Fallback: same heatlevel and temp_delta, any outdoor temp
         if outdoor_bucket is not None:
@@ -2128,9 +2313,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 if k[0] == heatlevel and k[1] == temp_delta_bucket and obs["count"] >= 1
             ]
             if matches:
-                avg_heating = sum(o["avg_heating_rate"] for o in matches) / len(matches)
-                avg_consumption = sum(o["avg_consumption_rate"] for o in matches) / len(matches)
-                return (avg_heating, avg_consumption)
+                return sum(o["avg_heating_rate"] for o in matches) / len(matches)
         
         # Fallback: same heatlevel and outdoor, any temp_delta
         if outdoor_bucket is not None:
@@ -2139,9 +2322,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 if k[0] == heatlevel and k[2] == outdoor_bucket and obs["count"] >= 1
             ]
             if matches:
-                avg_heating = sum(o["avg_heating_rate"] for o in matches) / len(matches)
-                avg_consumption = sum(o["avg_consumption_rate"] for o in matches) / len(matches)
-                return (avg_heating, avg_consumption)
+                return sum(o["avg_heating_rate"] for o in matches) / len(matches)
         
         # Fallback: same heatlevel only
         matches = [
@@ -2149,12 +2330,10 @@ class AduroCoordinator(DataUpdateCoordinator):
             if k[0] == heatlevel and obs["count"] >= 1
         ]
         if matches:
-            avg_heating = sum(o["avg_heating_rate"] for o in matches) / len(matches)
-            avg_consumption = sum(o["avg_consumption_rate"] for o in matches) / len(matches)
-            return (avg_heating, avg_consumption)
+            return sum(o["avg_heating_rate"] for o in matches) / len(matches)
         
         # No learned data - use defaults
-        return defaults.get(heatlevel, (0.6, 0.75))
+        return defaults.get(heatlevel, 0.6)
     
     def _get_cooling_rate(
         self,
@@ -2203,15 +2382,29 @@ class AduroCoordinator(DataUpdateCoordinator):
         # No learned data
         return default_cooling_rate
     
+    def _get_consumption_rate(self, heatlevel: int) -> float:
+        """
+        Get consumption rate for given heatlevel (NO outdoor temp dependency).
+        Returns: consumption_rate_kg_per_hour
+        """
+        obs = self._learning_data.get("consumption_observations", {}).get(heatlevel)
+        
+        if obs and obs["count"] >= 1:
+            return obs["avg_consumption_rate"]
+        
+        # Defaults if no learned data
+        defaults = {1: 0.35, 2: 0.75, 3: 1.2}
+        return defaults.get(heatlevel, 0.75)
+
     def _get_learning_status(self) -> dict[str, Any]:
         """Get status of learning data collection."""
-        # Calculate hours of observation per heat level
+        # Calculate hours of observation per heat level from consumption observations
         heatlevel_hours = {1: 0.0, 2: 0.0, 3: 0.0}
         
-        for key, obs in self._learning_data["heating_observations"].items():
-            heatlevel = key[0]
+        for heatlevel in [1, 2, 3]:
+            cons_obs = self._learning_data.get("consumption_observations", {}).get(heatlevel, {})
             # Estimate hours from count (assuming average 30 min per observation)
-            heatlevel_hours[heatlevel] += (obs["count"] * 0.5)
+            heatlevel_hours[heatlevel] = cons_obs.get("count", 0) * 0.5
         
         # Count waiting periods
         waiting_periods = sum(
@@ -2251,6 +2444,9 @@ class AduroCoordinator(DataUpdateCoordinator):
             "sufficient_data": sufficient_data,
             "total_heating_observations": len(self._learning_data["heating_observations"]),
             "total_cooling_observations": len(self._learning_data["cooling_observations"]),
+            "total_consumption_observations": sum(
+                1 for obs in self._learning_data["consumption_observations"].values() if obs["count"] > 0
+            ),
         }
     
     def _calculate_confidence_level(
@@ -2287,13 +2483,15 @@ class AduroCoordinator(DataUpdateCoordinator):
         current_state = self.data["operating"].get("state")
         current_operation_mode = self.data["status"].get("operation_mode")
         
-        # Only predict in heat level mode (0) or temperature mode (1)
-        if current_operation_mode not in [0, 1]:
-            return None
+        # Check if in wood mode - return N/A
+        if current_operation_mode == 2:
+            return {
+                "status": "wood_mode",
+                "message": "N/A - In wood mode",
+            }
         
-        # Don't predict when stove is off (not waiting, just off)
-        if current_state not in ["2", "4", "5", "6", "32"]:
-            return None
+        # Determine if stove is actually running
+        is_running = current_state in ["2", "4", "5", "6", "32"]
         
         # Get current conditions
         pellets_remaining = self.data.get("pellets", {}).get("amount", 0)
@@ -2305,8 +2503,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "depletion_datetime": datetime.now(),
                 "confidence": "high",
                 "status": "empty",
+                "prediction_mode": "actual" if is_running else "hypothetical",
             }
         
+        # Use current settings even when stove is off
         current_room_temp = self.data["operating"].get("boiler_temp", 20)
         target_temp = self.data["operating"].get("boiler_ref", 20)
         current_heatlevel = self.data["operating"].get("heatlevel", 2)
@@ -2324,19 +2524,45 @@ class AduroCoordinator(DataUpdateCoordinator):
             return {
                 "status": "insufficient_data",
                 "learning_status": learning_status,
+                "prediction_mode": "actual" if is_running else "hypothetical",
             }
+        
+        # Use cached weather forecast data (updated hourly in _async_update_data)
+        forecast_data = self._forecast_data
+        forecast_available = len(forecast_data) > 0
+        
+        # Validate minimum forecast horizon (24 hours)
+        forecast_horizon_hours = 0
+        if forecast_available:
+            now = datetime.now()
+            max_forecast_time = max(f["datetime"] for f in forecast_data)
+            forecast_horizon_hours = (max_forecast_time - now).total_seconds() / 3600
+            
+            if forecast_horizon_hours < 24:
+                _LOGGER.warning(
+                    "Weather forecast horizon too short: %.1fh (recommended: 24h+)",
+                    forecast_horizon_hours
+                )
+                # Still use it, but warn user
+        
+        _LOGGER.debug(
+            "Forecast status: available=%s, horizon=%.1fh, entries=%d",
+            forecast_available,
+            forecast_horizon_hours,
+            len(forecast_data)
+        )
         
         # === HEAT LEVEL MODE (Simple) ===
         if current_operation_mode == 0:
-            # Get consumption rate for current heat level
-            _, consumption_rate = self._get_heating_rate(
-                heatlevel=current_heatlevel,
-                temp_delta=0,  # Not relevant in heat level mode
-                outdoor_temp=outdoor_temp,
-            )
+            # Get consumption rate for current heat level (no outdoor temp dependency)
+            consumption_rate = self._get_consumption_rate(current_heatlevel)
             
             if consumption_rate <= 0:
-                return {"status": "insufficient_data", "learning_status": learning_status}
+                return {
+                    "status": "insufficient_data", 
+                    "learning_status": learning_status,
+                    "prediction_mode": "actual" if is_running else "hypothetical",
+                }
             
             # Account for current state - if in startup, that consumption is already happening
             pellets_for_calculation = pellets_remaining
@@ -2354,6 +2580,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         "depletion_datetime": datetime.now(),
                         "confidence": "high",
                         "status": "empty",
+                        "prediction_mode": "actual" if is_running else "hypothetical",
                     }
             
             # Simple calculation
@@ -2378,6 +2605,9 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "current_heatlevel": current_heatlevel,
                 "consumption_rate": round(consumption_rate, 2),
                 "learning_status": learning_status,
+                "prediction_mode": "actual" if is_running else "hypothetical",
+                "forecast_used": forecast_available,
+                "forecast_horizon_hours": round(forecast_horizon_hours, 1) if forecast_available else 0,
             }
         
         # === TEMPERATURE MODE (Complex with cycles) ===
@@ -2385,13 +2615,13 @@ class AduroCoordinator(DataUpdateCoordinator):
         cycles_count = 0
         pellets_left = pellets_remaining
         sim_room_temp = current_room_temp
-        sim_state = "burning" if current_state in ["5", "32"] else "waiting"
+        sim_state = "burning" if is_running else "waiting"
         sim_heatlevel = current_heatlevel
         time_at_current_level = 0
         
         # Track if we're already at level 1 for shutdown check
         time_at_level_1 = 0
-        if current_heatlevel == 1 and current_state in ["5", "32"]:
+        if current_heatlevel == 1 and is_running and current_state in ["5", "32"]:
             # Assume we've been at level 1 for at least 10 minutes (conservative)
             time_at_level_1 = 10 * 60
         
@@ -2415,20 +2645,48 @@ class AduroCoordinator(DataUpdateCoordinator):
                     # Ran out during startup
                     break
                 
-                # Simulate burning until next event
+# Simulate burning until next event
                 while pellets_left > 0:
                     temp_delta = target_temp - sim_room_temp
                     
-                    # Get heating and consumption rates
-                    heating_rate, consumption_rate = self._get_heating_rate(
+                    # === GET OUTDOOR TEMP FOR CURRENT SIMULATION TIME ===
+                    future_time = datetime.now() + timedelta(seconds=total_time_seconds)
+                    
+                    if forecast_available:
+                        forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
+                        
+                        # Fallback to current temp if forecast doesn't cover this time
+                        if forecast_temp is not None:
+                            outdoor_temp = forecast_temp
+                        else:
+                            outdoor_temp = self._get_external_temperature()
+                            if outdoor_temp is None:
+                                outdoor_temp = 0  # Final fallback
+                    else:
+                        # No forecast - use current external temp
+                        outdoor_temp = self._get_external_temperature()
+                        if outdoor_temp is None:
+                            outdoor_temp = 0  # Final fallback
+                    
+                    # Get heating rate (with current outdoor temp)
+                    heating_rate = self._get_heating_rate(
                         heatlevel=sim_heatlevel,
                         temp_delta=temp_delta,
                         outdoor_temp=outdoor_temp,
                     )
                     
+                    # Get consumption rate (NO outdoor temp dependency)
+                    consumption_rate = self._get_consumption_rate(sim_heatlevel)
+                    
                     if consumption_rate <= 0:
                         # Can't predict without consumption data
-                        return {"status": "insufficient_data", "learning_status": learning_status}
+                        return {
+                            "status": "insufficient_data", 
+                            "learning_status": learning_status,
+                            "prediction_mode": "actual" if is_running else "hypothetical",
+                            "forecast_used": forecast_available,
+                            "forecast_horizon_hours": round(forecast_horizon_hours, 1) if forecast_available else 0,
+                        }
                     
                     # Calculate time to next event
                     
@@ -2483,45 +2741,60 @@ class AduroCoordinator(DataUpdateCoordinator):
                         time_to_event = time_to_empty_seconds
                         next_event = "pellets_empty"
                     
-                    # Advance simulation to next event
-                    time_to_event = max(0, time_to_event)
+                    # This ensures we recalculate with new forecast temps
+                    max_step_size = 3600  # 1 hour in seconds
                     
-                    # Update state
-                    sim_room_temp += (heating_rate * time_to_event / 3600)
-                    pellets_consumed = consumption_rate * (time_to_event / 3600)
+                    if time_to_event > max_step_size and next_event not in ["pellets_empty", "increase_level", "decrease_level", "level_change_check"]:
+                        # Take a 1-hour step, then recalculate
+                        actual_step = max_step_size
+                        step_event = "temp_update"
+                    else:
+                        # Step is short enough or is a definitive event
+                        actual_step = time_to_event
+                        step_event = next_event
+                    
+                    actual_step = max(0, actual_step)
+                    
+                    # Update state for this step
+                    sim_room_temp += (heating_rate * actual_step / 3600)
+                    pellets_consumed = consumption_rate * (actual_step / 3600)
                     pellets_left -= pellets_consumed
                     pellets_left = max(0, pellets_left)
                     
-                    total_time_seconds += time_to_event
-                    time_at_current_level += time_to_event
+                    total_time_seconds += actual_step
+                    time_at_current_level += actual_step
                     
                     if sim_heatlevel == 1:
-                        time_at_level_1 += time_to_event
+                        time_at_level_1 += actual_step
                     
                     # Handle event
-                    if next_event == "pellets_empty":
+                    if step_event == "pellets_empty" or pellets_left <= 0:
                         # Done!
                         break
                     
-                    elif next_event == "increase_level":
+                    elif step_event == "temp_update":
+                        # Just a temperature update step, continue loop to recalculate
+                        continue
+                    
+                    elif step_event == "increase_level":
                         sim_heatlevel = min(3, sim_heatlevel + 1)
                         time_at_current_level = 0
                         if sim_heatlevel == 1:
                             time_at_level_1 = 0
                         continue
                     
-                    elif next_event == "decrease_level":
+                    elif step_event == "decrease_level":
                         sim_heatlevel = max(1, sim_heatlevel - 1)
                         time_at_current_level = 0
                         if sim_heatlevel == 1:
                             time_at_level_1 = 0
                         continue
                     
-                    elif next_event == "level_change_check":
+                    elif step_event == "level_change_check":
                         # Just reached 10 minutes, check again
                         continue
                     
-                    elif next_event == "shutdown":
+                    elif step_event == "shutdown":
                         # Enter waiting period
                         sim_state = "waiting"
                         sim_heatlevel = 1  # Will restart at level 1
@@ -2535,27 +2808,63 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             # === WAITING PHASE ===
             if sim_state == "waiting":
-                # Get cooling rate
-                cooling_rate = self._get_cooling_rate(
-                    start_room_temp=sim_room_temp,
-                    outdoor_temp=outdoor_temp,
-                )
-                
-                # Calculate time to restart
+                # Calculate target restart temperature
                 restart_temp = target_temp - restart_delta
-                temp_to_lose = sim_room_temp - restart_temp
                 
-                if temp_to_lose > 0 and cooling_rate > 0:
-                    wait_time_seconds = (temp_to_lose / cooling_rate) * 3600
-                else:
-                    # Default to 2.5 hours if can't calculate
-                    wait_time_seconds = 2.5 * 3600
-                
-                # Update state
-                sim_room_temp -= (cooling_rate * wait_time_seconds / 3600)
-                total_time_seconds += wait_time_seconds
-                
-                # No consumption during waiting
+                # Simulate cooling in steps until restart temperature reached
+                while sim_room_temp > restart_temp and pellets_left > 0:
+                    # === GET OUTDOOR TEMP FOR CURRENT SIMULATION TIME ===
+                    future_time = datetime.now() + timedelta(seconds=total_time_seconds)
+                    
+                    if forecast_available:
+                        forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
+                        
+                        if forecast_temp is not None:
+                            outdoor_temp = forecast_temp
+                        else:
+                            outdoor_temp = self._get_external_temperature()
+                            if outdoor_temp is None:
+                                outdoor_temp = 0
+                    else:
+                        outdoor_temp = self._get_external_temperature()
+                        if outdoor_temp is None:
+                            outdoor_temp = 0
+                    
+                    # Get cooling rate (with current outdoor temp)
+                    cooling_rate = self._get_cooling_rate(
+                        start_room_temp=sim_room_temp,
+                        outdoor_temp=outdoor_temp,
+                    )
+                    
+                    # Calculate time to reach restart temp at current cooling rate
+                    temp_to_lose = sim_room_temp - restart_temp
+                    
+                    if temp_to_lose > 0 and cooling_rate > 0:
+                        time_to_restart = (temp_to_lose / cooling_rate) * 3600
+                    else:
+                        # Can't cool or already at restart temp
+                        break
+                    
+                    # Limit step size to 1 hour for temperature updates
+                    max_step_size = 3600  # 1 hour in seconds
+                    
+                    if time_to_restart > max_step_size:
+                        # Take a 1-hour step, then recalculate with new outdoor temp
+                        actual_step = max_step_size
+                        temp_decrease = cooling_rate * (actual_step / 3600)
+                    else:
+                        # Will reach restart temp within the hour
+                        actual_step = time_to_restart
+                        temp_decrease = temp_to_lose
+                    
+                    # Update state
+                    sim_room_temp -= temp_decrease
+                    total_time_seconds += actual_step
+                    
+                    # Check if we've reached restart temperature
+                    if sim_room_temp <= restart_temp:
+                        sim_room_temp = restart_temp  # Don't overshoot
+                        break
                 
                 # After waiting, restart at level 1
                 sim_state = "burning"
@@ -2580,10 +2889,13 @@ class AduroCoordinator(DataUpdateCoordinator):
             "status": "ok",
             "mode": "temperature",
             "cycles_remaining": cycles_count,
-            "current_phase": "burning" if current_state in ["5", "32"] else "waiting",
+            "current_phase": "burning" if current_state in ["2", "4", "5", "32"] else "waiting" if current_state == "6" else "off",
             "learning_status": learning_status,
             "shutdown_delta": round(shutdown_delta, 1),
             "restart_delta": round(restart_delta, 1),
+            "prediction_mode": "actual" if is_running else "hypothetical",
+            "forecast_used": forecast_available,
+            "forecast_horizon_hours": round(forecast_horizon_hours, 1) if forecast_available else 0,
         }
     
     def _format_time_remaining(self, seconds: int) -> str:
@@ -2634,10 +2946,12 @@ class AduroCoordinator(DataUpdateCoordinator):
                             "last_updated": v["last_updated"].isoformat() if isinstance(v.get("last_updated"), datetime) else str(v.get("last_updated", ""))
                         } for k, v in self._learning_data["cooling_observations"].items()
                     },
+                    "consumption_observations": self._learning_data["consumption_observations"],
                     "startup_observations": self._learning_data["startup_observations"],
                     "shutdown_restart_deltas": self._learning_data["shutdown_restart_deltas"],
                 },
                 "external_temp_sensor": self._external_temp_sensor,
+                "weather_forecast_sensor": self._weather_forecast_sensor,
 
                 # Save learning consumption tracker
                 "learning_consumption_total": self._learning_consumption_total,

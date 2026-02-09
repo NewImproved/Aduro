@@ -127,8 +127,12 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._low_wood_alert_active = False
         self._low_wood_alert_sent = False
 
+        # Pellet depletion prediction tracking
+        self._last_prediction_time = None
+        self._last_prediction_log = None
+        self._prediction_change_threshold_seconds = 1800  # 30 minutes
+
         # Learning system for pellet depletion prediction
-        # VERSION 2 structure - separate consumption from heating observations
         self._learning_data = {
             "heating_observations": {},  # (heatlevel, temp_delta, outdoor) -> heating_rate only
             "cooling_observations": {},
@@ -2595,7 +2599,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 cycles_predicted=0,
             )
             
-            return {
+            result = {
                 "time_remaining_seconds": time_remaining_seconds,
                 "time_remaining_formatted": self._format_time_remaining(time_remaining_seconds),
                 "depletion_datetime": depletion_datetime,
@@ -2609,11 +2613,29 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "forecast_used": forecast_available,
                 "forecast_horizon_hours": round(forecast_horizon_hours, 1) if forecast_available else 0,
             }
+            
+            # Check if prediction changed significantly and log details
+            current_time = result["time_remaining_seconds"]
+            
+            if self._last_prediction_time is not None:
+                time_change = abs(current_time - self._last_prediction_time)
+                
+                if time_change >= self._prediction_change_threshold_seconds:
+                    _LOGGER.debug("Prediction changed significantly: %ds change", time_change)
+                    _LOGGER.debug("PREVIOUS PREDICTION:\n%s", self._last_prediction_log or "No previous log")
+                    _LOGGER.debug("NEW PREDICTION:\n%s", self._build_prediction_log(result, None))
+            
+            # Store current prediction for next comparison
+            self._last_prediction_time = current_time
+            self._last_prediction_log = self._build_prediction_log(result, None)
+            
+            return result
         
         # === TEMPERATURE MODE (Complex with cycles) ===
         total_time_seconds = 0
         cycles_count = 0
         pellets_left = pellets_remaining
+        simulation_log = []  # Track each phase for logging
         sim_room_temp = current_room_temp
         sim_state = "burning" if is_running else "waiting"
         sim_heatlevel = current_heatlevel
@@ -2641,11 +2663,18 @@ class AduroCoordinator(DataUpdateCoordinator):
                 pellets_left -= startup_consumption
                 total_time_seconds += startup_duration
                 
+                # Log startup phase
+                simulation_log.append({
+                    "type": "startup",
+                    "duration_seconds": startup_duration,
+                    "consumption_kg": startup_consumption,
+                })
+                
                 if pellets_left <= 0:
                     # Ran out during startup
                     break
                 
-# Simulate burning until next event
+                # Simulate burning until next event
                 while pellets_left > 0:
                     temp_delta = target_temp - sim_room_temp
                     
@@ -2756,6 +2785,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                     actual_step = max(0, actual_step)
                     
                     # Update state for this step
+                    start_temp_for_log = sim_room_temp
                     sim_room_temp += (heating_rate * actual_step / 3600)
                     pellets_consumed = consumption_rate * (actual_step / 3600)
                     pellets_left -= pellets_consumed
@@ -2763,6 +2793,21 @@ class AduroCoordinator(DataUpdateCoordinator):
                     
                     total_time_seconds += actual_step
                     time_at_current_level += actual_step
+                    
+                    # Log this heating step
+                    simulation_log.append({
+                        "type": "heating",
+                        "heatlevel": sim_heatlevel,
+                        "duration_seconds": actual_step,
+                        "start_temp": start_temp_for_log,
+                        "end_temp": sim_room_temp,
+                        "outdoor_temp": outdoor_temp,
+                        "heating_rate": heating_rate,
+                        "consumption_rate": consumption_rate,
+                        "pellets_used": pellets_consumed,
+                        "pellets_remaining": pellets_left,
+                        "reason": step_event,
+                    })
                     
                     if sim_heatlevel == 1:
                         time_at_level_1 += actual_step
@@ -2777,14 +2822,26 @@ class AduroCoordinator(DataUpdateCoordinator):
                         continue
                     
                     elif step_event == "increase_level":
+                        old_level = sim_heatlevel
                         sim_heatlevel = min(3, sim_heatlevel + 1)
+                        simulation_log.append({
+                            "type": "level_change",
+                            "old_level": old_level,
+                            "new_level": sim_heatlevel,
+                        })
                         time_at_current_level = 0
                         if sim_heatlevel == 1:
                             time_at_level_1 = 0
                         continue
                     
                     elif step_event == "decrease_level":
+                        old_level = sim_heatlevel
                         sim_heatlevel = max(1, sim_heatlevel - 1)
+                        simulation_log.append({
+                            "type": "level_change",
+                            "old_level": old_level,
+                            "new_level": sim_heatlevel,
+                        })
                         time_at_current_level = 0
                         if sim_heatlevel == 1:
                             time_at_level_1 = 0
@@ -2858,8 +2915,20 @@ class AduroCoordinator(DataUpdateCoordinator):
                         temp_decrease = temp_to_lose
                     
                     # Update state
+                    start_temp_for_log = sim_room_temp
                     sim_room_temp -= temp_decrease
                     total_time_seconds += actual_step
+                    
+                    # Log cooling step
+                    simulation_log.append({
+                        "type": "waiting",
+                        "duration_seconds": actual_step,
+                        "start_temp": start_temp_for_log,
+                        "end_temp": sim_room_temp,
+                        "outdoor_temp": outdoor_temp,
+                        "cooling_rate": cooling_rate,
+                        "restart_temp": restart_temp,
+                    })
                     
                     # Check if we've reached restart temperature
                     if sim_room_temp <= restart_temp:
@@ -2881,7 +2950,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             cycles_predicted=cycles_count,
         )
         
-        return {
+        result = {
             "time_remaining_seconds": int(total_time_seconds),
             "time_remaining_formatted": self._format_time_remaining(int(total_time_seconds)),
             "depletion_datetime": depletion_datetime,
@@ -2897,6 +2966,23 @@ class AduroCoordinator(DataUpdateCoordinator):
             "forecast_used": forecast_available,
             "forecast_horizon_hours": round(forecast_horizon_hours, 1) if forecast_available else 0,
         }
+        
+        # Check if prediction changed significantly and log details
+        current_time = result["time_remaining_seconds"]
+        
+        if self._last_prediction_time is not None:
+            time_change = abs(current_time - self._last_prediction_time)
+            
+            if time_change >= self._prediction_change_threshold_seconds:
+                _LOGGER.debug("Prediction changed significantly: %ds change", time_change)
+                _LOGGER.debug("PREVIOUS PREDICTION:\n%s", self._last_prediction_log or "No previous log")
+                _LOGGER.debug("NEW PREDICTION:\n%s", self._build_prediction_log(result, simulation_log))
+        
+        # Store current prediction for next comparison
+        self._last_prediction_time = current_time
+        self._last_prediction_log = self._build_prediction_log(result, simulation_log)
+        
+        return result
     
     def _format_time_remaining(self, seconds: int) -> str:
         """Format time remaining as 'Xh Ym' or 'Xd Yh' if >24 hours."""
@@ -2911,6 +2997,92 @@ class AduroCoordinator(DataUpdateCoordinator):
             return f"{days}d {hours}h"
         else:
             return f"{hours}h {minutes}m"
+
+    def _build_prediction_log(
+            self,
+            prediction: dict[str, Any],
+            simulation_log: list[dict[str, Any]] | None = None
+        ) -> str:
+            """Build detailed log of prediction calculation."""
+            lines = []
+            lines.append("=" * 80)
+            lines.append("PELLET DEPLETION PREDICTION DETAILS")
+            lines.append("=" * 80)
+            
+            # Basic info
+            status = prediction.get("status")
+            lines.append(f"Status: {status}")
+            lines.append(f"Prediction Mode: {prediction.get('prediction_mode', 'unknown')}")
+            lines.append(f"Confidence: {prediction.get('confidence', 'unknown')}")
+            
+            if status == "ok":
+                lines.append(f"Time Remaining: {prediction.get('time_remaining_formatted')} ({prediction.get('time_remaining_seconds')}s)")
+                lines.append(f"Depletion DateTime: {prediction.get('depletion_datetime')}")
+                lines.append(f"Mode: {prediction.get('mode')}")
+                
+                # Weather info
+                lines.append(f"Forecast Used: {prediction.get('forecast_used', False)}")
+                if prediction.get('forecast_used'):
+                    lines.append(f"Forecast Horizon: {prediction.get('forecast_horizon_hours', 0)}h")
+            
+            # Current conditions
+            if self.data and "operating" in self.data:
+                lines.append("")
+                lines.append("CURRENT CONDITIONS:")
+                lines.append(f"  Room Temperature: {self.data['operating'].get('boiler_temp')}°C")
+                lines.append(f"  Target Temperature: {self.data['operating'].get('boiler_ref')}°C")
+                lines.append(f"  Heat Level: {self.data['operating'].get('heatlevel')}")
+                lines.append(f"  State: {self.data['operating'].get('state')}")
+                
+            external_temp = self._get_external_temperature()
+            if external_temp is not None:
+                lines.append(f"  External Temperature: {external_temp}°C")
+            
+            # Pellet info
+            if self.data and "pellets" in self.data:
+                lines.append("")
+                lines.append("PELLET STATUS:")
+                lines.append(f"  Remaining: {self.data['pellets'].get('amount')} kg ({self.data['pellets'].get('percentage')}%)")
+            
+            # Simulation details (if available)
+            if simulation_log:
+                lines.append("")
+                lines.append("SIMULATION PHASES:")
+                lines.append("-" * 80)
+                
+                for phase in simulation_log:
+                    phase_type = phase.get("type")
+                    duration_min = phase.get("duration_seconds", 0) / 60
+                    
+                    if phase_type == "startup":
+                        lines.append(f"  STARTUP: {duration_min:.1f} min")
+                        lines.append(f"    Consumption: {phase.get('consumption_kg', 0):.3f} kg")
+                        
+                    elif phase_type == "heating":
+                        lines.append(f"  HEATING (HL{phase.get('heatlevel')}): {duration_min:.1f} min")
+                        lines.append(f"    Temp: {phase.get('start_temp'):.1f}°C → {phase.get('end_temp'):.1f}°C")
+                        lines.append(f"    Outdoor Temp: {phase.get('outdoor_temp')}°C")
+                        lines.append(f"    Heating Rate: {phase.get('heating_rate'):.2f}°C/h")
+                        lines.append(f"    Consumption Rate: {phase.get('consumption_rate'):.2f} kg/h")
+                        lines.append(f"    Pellets Used: {phase.get('pellets_used'):.3f} kg")
+                        lines.append(f"    Pellets Remaining: {phase.get('pellets_remaining'):.3f} kg")
+                        if phase.get('reason'):
+                            lines.append(f"    Ended: {phase.get('reason')}")
+                        
+                    elif phase_type == "waiting":
+                        lines.append(f"  WAITING: {duration_min:.1f} min")
+                        lines.append(f"    Temp: {phase.get('start_temp'):.1f}°C → {phase.get('end_temp'):.1f}°C")
+                        lines.append(f"    Outdoor Temp: {phase.get('outdoor_temp')}°C")
+                        lines.append(f"    Cooling Rate: {phase.get('cooling_rate'):.2f}°C/h")
+                        lines.append(f"    Target Restart: {phase.get('restart_temp'):.1f}°C")
+                        
+                    elif phase_type == "level_change":
+                        lines.append(f"  LEVEL CHANGE: HL{phase.get('old_level')} → HL{phase.get('new_level')}")
+                        
+                    lines.append("")
+            
+            lines.append("=" * 80)
+            return "\n".join(lines)
 
     async def async_save_pellet_data(self) -> None:
         """Save pellet tracking data to storage."""

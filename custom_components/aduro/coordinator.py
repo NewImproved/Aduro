@@ -2949,6 +2949,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 
                 # Event 3: Level change check for current conditions (immediate)
                 if time_at_current_level >= 10 * 60:
+                    shutdown_temp = target_temp + shutdown_delta
                     # Already too hot: decrease immediately
                     if temp_delta < -0.5 and sim_heatlevel > 1:
                         time_to_event = 0

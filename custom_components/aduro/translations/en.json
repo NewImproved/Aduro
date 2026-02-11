@@ -20,7 +20,9 @@
       "missing_pin": "PIN is required",
       "invalid_ip": "Invalid IP address format",
       "cannot_connect": "Failed to connect",
-      "unknown": "Unexpected error"
+      "unknown": "Unexpected error",
+      "sensor_not_found": "Sensor not found",
+      "not_weather_entity": "No weather entity"
     },
     "abort": {
       "already_configured": "This stove is already configured"
@@ -33,10 +35,14 @@
         "description": "Update stove settings",
         "data": {
           "stove_model": "Stove Model",
-          "stove_ip": "Fixed IP Address (Optional)"
+          "stove_ip": "Fixed IP Address (Optional)",
+          "external_temp_sensor": "Sensor for outside temperature (Recommended)",
+          "weather_forecast_sensor": "Sensor for hourly weather forecasts (Recommeded)"
         },
         "data_description": {
-          "stove_ip": "Leave empty for automatic discovery, or enter a fixed IP address"
+          "stove_ip": "Leave empty for automatic discovery, or enter a fixed IP address",
+          "external_temp_sensor": "Add sensor to allow for better learning data for pellets depletion sensor",
+          "weather_forecast_sensor": "Add sensor to increase precision for pellets depletion sensor"
         },
         "menu_options": {
           "pellet_settings": "Pellet Settings",
@@ -278,6 +284,9 @@
       },
       "carbon_monoxide_red": {
         "name": "Carbon monoxide level red"
+      },
+      "pellet_depletion": {
+        "name": "Time for empty pellets stove"
       }
     },
     "switch": {

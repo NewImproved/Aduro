@@ -213,6 +213,11 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._last_network_update = datetime.now() - timedelta(minutes=10)
         self._last_consumption_update = datetime.now() - timedelta(minutes=10)
         
+        # Connection health tracking
+        self._consecutive_failures = 0
+        self._max_failures_before_rediscovery = 3
+        self._last_successful_update: datetime | None = None
+
         super().__init__(
             hass,
             _LOGGER,
@@ -346,28 +351,79 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._last_pellet_save = datetime.now()
                 _LOGGER.debug("Periodic pellet data save triggered")
             
+            # Reset failure counter on success
+            self._consecutive_failures = 0
+            self._last_successful_update = datetime.now()
+            
             _LOGGER.debug("Data update cycle completed successfully")
             return data
             
         except Exception as err:
             _LOGGER.error("Error fetching stove data: %s", err, exc_info=True)
-            # Try to rediscover on next update
-            self.stove_ip = None
+            
+            # Track consecutive failures
+            self._consecutive_failures += 1
+            
+            _LOGGER.warning(
+                "Consecutive failures: %d/%d",
+                self._consecutive_failures,
+                self._max_failures_before_rediscovery
+            )
+            
+            # Force rediscovery after multiple consecutive failures
+            if self._consecutive_failures >= self._max_failures_before_rediscovery:
+                _LOGGER.warning(
+                    "Reached %d consecutive failures, forcing rediscovery on next update",
+                    self._max_failures_before_rediscovery
+                )
+                self.stove_ip = None  # This will trigger rediscovery
+                self.last_discovery = None
+                self._consecutive_failures = 0  # Reset counter
+            
             raise UpdateFailed(f"Error communicating with stove: {err}")
 
     def _should_rediscover(self) -> bool:
-        """Determine if we should rediscover the stove."""
+        """
+        Determine if we should rediscover the stove.
+        
+        Strategy:
+        - Never rediscover when using fixed IP (unless verification fails)
+        - Rediscover every 15 minutes when using cloud backup (to try finding local connection)
+        - Rediscover every 1 hour when using local IP (to detect IP changes)
+        """
+        
         # Don't rediscover if using fixed IP
         if self.fixed_ip:
             return False
         
         if self.last_discovery is None:
             return True
-        # Rediscover every hour
+        
+        # If currently using cloud backup, try to rediscover local IP more frequently
+        # This allows the integration to reconnect to local network when it becomes available
+        if self.stove_ip == CLOUD_BACKUP_ADDRESS:
+            rediscovery_interval = timedelta(minutes=15)
+            _LOGGER.debug("Using cloud backup - checking for local connection every 15 minutes")
+        else:
+            rediscovery_interval = timedelta(hours=1)
+            _LOGGER.debug("Using local IP - checking for IP changes every 1 hour")
+        
         try:
-            return (datetime.now() - self.last_discovery) > timedelta(hours=1)
+            time_since_discovery = datetime.now() - self.last_discovery
+            should_rediscover = time_since_discovery > rediscovery_interval
+            
+            if should_rediscover:
+                _LOGGER.debug(
+                    "Rediscovery needed - %s since last discovery (threshold: %s)",
+                    time_since_discovery,
+                    rediscovery_interval
+                )
+            
+            return should_rediscover
+            
         except TypeError:
-            _LOGGER.debug("Invalid last_discovery timestamp, forcing rediscovery")
+            _LOGGER.warning("Invalid last_discovery timestamp, forcing rediscovery")
+            self.last_discovery = None
             return True
 
     def _should_update_network(self) -> bool:
@@ -974,24 +1030,118 @@ class AduroCoordinator(DataUpdateCoordinator):
         }
 
     async def _async_discover_stove(self) -> None:
-        """Discover the stove on the network."""
-        # If fixed IP is configured, use it instead of discovery
+        """Discover the stove on the network with retry logic and graceful fallback."""
+        
+        # =========================================================================
+        # FIXED IP MODE
+        # =========================================================================
         if self.fixed_ip:
-            _LOGGER.info("Using fixed IP address: %s", self.fixed_ip)
+            _LOGGER.info("Using configured fixed IP: %s", self.fixed_ip)
             self.stove_ip = self.fixed_ip
             self.last_discovery = datetime.now()
             
-            # Try to get firmware info if possible
-            try:
-                response = await self.hass.async_add_executor_job(discover.run)
-                data = response.parse_payload()
+            # Verify fixed IP is reachable
+            if await self._verify_stove_reachable(self.fixed_ip):
+                _LOGGER.debug("Fixed IP verified reachable")
                 
+                # Try to get firmware info, but don't fail if we can't
+                try:
+                    response = await self.hass.async_add_executor_job(discover.run)
+                    
+                    if response is None:
+                        _LOGGER.debug("Discovery returned None (firmware info unavailable), continuing with fixed IP")
+                        return
+                    
+                    data = response.parse_payload()
+                    
+                    old_version = self.firmware_version
+                    old_build = self.firmware_build
+                    
+                    self.firmware_version = data.get("Ver")
+                    self.firmware_build = data.get("Build")
+                    
+                    version_changed = (old_version != self.firmware_version or 
+                                    old_build != self.firmware_build)
+                    
+                    if version_changed and old_version is not None:
+                        _LOGGER.info(
+                            "Firmware version changed from %s.%s to %s.%s",
+                            old_version or "?",
+                            old_build or "?",
+                            self.firmware_version or "?",
+                            self.firmware_build or "?"
+                        )
+                        await self._update_device_registry()
+                except Exception as err:
+                    _LOGGER.debug("Could not get firmware info via discovery: %s (continuing with fixed IP)", err)
+                
+                return
+            else:
+                _LOGGER.warning("Fixed IP %s not reachable, falling back to discovery", self.fixed_ip)
+                # Fall through to discovery with retries
+        
+        # =========================================================================
+        # DISCOVERY MODE WITH RETRIES
+        # =========================================================================
+        max_retries = 10
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                _LOGGER.debug("Discovery attempt %d/%d", attempt + 1, max_retries)
+                
+                response = await self.hass.async_add_executor_job(discover.run)
+                
+                # Handle None response (stove not responding)
+                if response is None:
+                    _LOGGER.warning("Discovery attempt %d/%d returned None (stove not responding locally)", 
+                                attempt + 1, max_retries)
+                    
+                    if attempt < max_retries - 1:
+                        _LOGGER.debug("Waiting %d seconds before retry...", retry_delay)
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff (1s, 2s, 4s)
+                        continue
+                    else:
+                        # All retries exhausted
+                        _LOGGER.warning(
+                            "All %d discovery attempts failed, using cloud backup: %s",
+                            max_retries,
+                            CLOUD_BACKUP_ADDRESS
+                        )
+                        self.stove_ip = CLOUD_BACKUP_ADDRESS
+                        self.last_discovery = datetime.now()
+                        return
+                
+                # Success - parse response
+                data = response.parse_payload()
+                discovered_ip = data.get("IP", CLOUD_BACKUP_ADDRESS)
+                
+                # Store previous versions to detect changes
                 old_version = self.firmware_version
                 old_build = self.firmware_build
                 
                 self.firmware_version = data.get("Ver")
                 self.firmware_build = data.get("Build")
                 
+                # Validate discovered IP
+                if not discovered_ip or "0.0.0.0" in discovered_ip:
+                    _LOGGER.warning("Invalid discovered IP (%s), using cloud backup", discovered_ip)
+                    self.stove_ip = CLOUD_BACKUP_ADDRESS
+                else:
+                    self.stove_ip = discovered_ip
+                    _LOGGER.info("Successfully discovered stove at: %s", self.stove_ip)
+                
+                self.last_discovery = datetime.now()
+                
+                _LOGGER.info(
+                    "Discovered stove at: %s (Firmware: %s Build: %s)",
+                    self.stove_ip,
+                    self.firmware_version,
+                    self.firmware_build,
+                )
+                
+                # Check if firmware changed
                 version_changed = (old_version != self.firmware_version or 
                                 old_build != self.firmware_build)
                 
@@ -1004,64 +1154,67 @@ class AduroCoordinator(DataUpdateCoordinator):
                         self.firmware_build or "?"
                     )
                     await self._update_device_registry()
+                
+                return  # Success!
+                
             except Exception as err:
-                _LOGGER.debug("Could not get firmware info via discovery: %s", err)
-            
-            return
+                _LOGGER.warning("Discovery attempt %d/%d failed with exception: %s", 
+                            attempt + 1, max_retries, err)
+                
+                if attempt < max_retries - 1:
+                    _LOGGER.debug("Waiting %d seconds before retry...", retry_delay)
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    # All retries exhausted
+                    _LOGGER.warning(
+                        "All %d discovery attempts failed, using cloud backup: %s",
+                        max_retries,
+                        CLOUD_BACKUP_ADDRESS
+                    )
+                    self.stove_ip = CLOUD_BACKUP_ADDRESS
+                    self.last_discovery = datetime.now()
+                    return
+
+    async def _verify_stove_reachable(self, ip: str) -> bool:
+        """
+        Verify stove is reachable at given IP by attempting a simple status query.
         
-        # Discovery logic for when no fixed IP is set
+        Args:
+            ip: IP address to verify
+        
+        Returns:
+            bool: True if stove responds, False otherwise
+        """
         try:
-            response = await self.hass.async_add_executor_job(discover.run)
-            data = response.parse_payload()
-
-            self.stove_ip = data.get("IP", CLOUD_BACKUP_ADDRESS)
+            _LOGGER.debug("Verifying stove reachability at %s", ip)
             
-            # Store previous versions to detect changes
-            old_version = self.firmware_version
-            old_build = self.firmware_build
-            
-            self.firmware_version = data.get("Ver")
-            self.firmware_build = data.get("Build")
-
-            _LOGGER.debug(
-                "Discovery complete - IP: %s, Version: %s, Build: %s",
-                self.stove_ip,
-                self.firmware_version,
-                self.firmware_build,
+            # Try a simple status query with short timeout
+            response = await asyncio.wait_for(
+                self.hass.async_add_executor_job(
+                    raw.run,
+                    ip,
+                    self.serial,
+                    self.pin,
+                    11,  # function_id for status
+                    "*"  # payload
+                ),
+                timeout=5.0  # 5 second timeout
             )
-
-            if not self.stove_ip or "0.0.0.0" in self.stove_ip:
-                self.stove_ip = CLOUD_BACKUP_ADDRESS
-                _LOGGER.warning(
-                    "Invalid stove IP, using cloud backup: %s", CLOUD_BACKUP_ADDRESS
-                )
-
-            self.last_discovery = datetime.now()
-            _LOGGER.info(
-                "Discovered stove at: %s (Firmware: %s Build: %s)",
-                self.stove_ip,
-                self.firmware_version,
-                self.firmware_build,
-            )
-
-            # Check if firmware changed
-            version_changed = (old_version != self.firmware_version or 
-                            old_build != self.firmware_build)
             
-            if version_changed and old_version is not None:
-                _LOGGER.info(
-                    "Firmware version changed from %s.%s to %s.%s",
-                    old_version or "?",
-                    old_build or "?",
-                    self.firmware_version or "?",
-                    self.firmware_build or "?"
-                )
-                await self._update_device_registry()
-
+            if response is None:
+                _LOGGER.debug("Verification failed: response is None")
+                return False
+            
+            _LOGGER.debug("Stove at %s is reachable", ip)
+            return True
+            
+        except asyncio.TimeoutError:
+            _LOGGER.debug("Verification timeout for %s (5 seconds)", ip)
+            return False
         except Exception as err:
-            _LOGGER.warning("Discovery failed, using cloud backup: %s", err)
-            self.stove_ip = CLOUD_BACKUP_ADDRESS
-            self.last_discovery = datetime.now()
+            _LOGGER.debug("Verification failed for %s: %s", ip, err)
+            return False
 
     async def _async_get_status(self) -> dict[str, Any] | None:
         """Get comprehensive status from the stove."""

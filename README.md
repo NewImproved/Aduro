@@ -105,6 +105,7 @@ The system automatically learns from your stove's operation by tracking:
   4. Automatic restart when temperature drops
 - Predicts multiple cycles until pellets run out
 - Accounts for stove's automatic level adjustments every 10+ minutes
+- Updates the calculation with the forecasted temperature for each hour into the simulation
 
 ### Prediction Accuracy
 

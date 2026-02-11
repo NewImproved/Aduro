@@ -1683,7 +1683,6 @@ class AduroPelletDepletionSensor(AduroSensorBase):
                 "learning_sufficient_data": learning_status.get("sufficient_data", False),
                 "learning_total_heating_obs": learning_status.get("total_heating_observations", 0),
                 "learning_total_cooling_obs": learning_status.get("total_cooling_observations", 0),
-                "learning_total_consumption_obs": learning_status.get("total_consumption_observations", 0),
             }
 
             # Add learning consumption tracker info

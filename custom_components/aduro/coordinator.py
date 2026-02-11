@@ -130,13 +130,13 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Pellet depletion prediction tracking
         self._last_prediction_time = None
         self._last_prediction_log = None
-        self._prediction_change_threshold_seconds = 1800  # 30 minutes
+        self._prediction_change_threshold_seconds = 300  # 5 minutes
 
         # Learning system for pellet depletion prediction
         self._learning_data = {
             "heating_observations": {},  # (heatlevel, temp_delta, outdoor) -> heating_rate only
             "cooling_observations": {},
-            "consumption_observations": {  # NEW: heatlevel -> consumption_rate
+            "consumption_observations": {  # heatlevel -> consumption_rate
                 1: {
                     "count": 0,
                     "total_consumption_rate": 0.0,
@@ -853,7 +853,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         pellets = {
             "capacity": self._pellet_capacity,
             "consumed": self._pellets_consumed,
-            "consumed_total": self._pellets_consumed_total,  # NEW: Total since cleaning
+            "consumed_total": self._pellets_consumed_total,  # Total since cleaning
             "amount": amount_remaining,
             "percentage": percentage_remaining,
             "notification_level": self._notification_level,
@@ -2463,8 +2463,8 @@ class AduroCoordinator(DataUpdateCoordinator):
         # High accuracy criteria
         if (learning_status["sufficient_data"] and
             learning_status["recent_data"] and
-            operation_mode == 0 and  # Heat level mode
-            cycles_predicted < 3):
+            (operation_mode == 0 or  # Heat level mode
+            (operation_mode == 1 and cycles_predicted < 3))):# Temperature mode
             return "high"
         
         # Low accuracy criteria
@@ -2498,7 +2498,18 @@ class AduroCoordinator(DataUpdateCoordinator):
         is_running = current_state in ["2", "4", "5", "6", "32"]
         
         # Get current conditions
-        pellets_remaining = self.data.get("pellets", {}).get("amount", 0)
+
+        # Check if auto shut down is enabled and remove the removed capacity
+        if self._auto_shutdown_enabled:
+            pellets_data = self.data.get("pellets", {})
+            total_volume = self.data["pellets"].get("capacity", 0)
+            removed_percentage = self.data["pellets"].get("shutdown_level", 0) / 100
+            removed_volume = total_volume * removed_percentage
+            pellets_remaining = self.data.get("pellets", {}).get("amount", 0) - removed_volume
+
+        else:
+            pellets_remaining = self.data.get("pellets", {}).get("amount", 0)
+
         
         if pellets_remaining <= 0:
             return {
@@ -2635,19 +2646,23 @@ class AduroCoordinator(DataUpdateCoordinator):
         total_time_seconds = 0
         cycles_count = 0
         pellets_left = pellets_remaining
-        simulation_log = []  # Track each phase for logging
-        sim_room_temp = current_room_temp
-        sim_state = "burning" if is_running else "waiting"
-        sim_heatlevel = current_heatlevel
-        time_at_current_level = 0
+        simulation_log = []
         
-        # Track if we're already at level 1 for shutdown check
-        time_at_level_1 = 0
-        if current_heatlevel == 1 and is_running and current_state in ["5", "32"]:
-            # Assume we've been at level 1 for at least 10 minutes (conservative)
-            time_at_level_1 = 10 * 60
+        # Determine initial state
+        if is_running:
+            sim_state = "burning"
+            sim_room_temp = current_room_temp
+            sim_heatlevel = current_heatlevel
+            time_at_current_level = 0  # Reset on simulation start
+            time_at_level_1 = 0 if current_heatlevel != 1 else 0
+        else:
+            sim_state = "waiting"
+            sim_room_temp = current_room_temp
+            sim_heatlevel = 1  # Will restart at level 1
+            time_at_current_level = 0
+            time_at_level_1 = 0
         
-        max_iterations = 100  # Safety limit
+        max_iterations = 100
         iteration = 0
         startup_consumption = self._learning_data["startup_observations"]["avg_consumption"]
         startup_duration = self._learning_data["startup_observations"]["avg_duration"]
@@ -2655,271 +2670,36 @@ class AduroCoordinator(DataUpdateCoordinator):
         while pellets_left > 0 and iteration < max_iterations:
             iteration += 1
             
-            # === BURNING PHASE ===
-            if sim_state == "burning":
-                cycles_count += 1
-                
-                # Account for startup consumption at beginning of each cycle
-                pellets_left -= startup_consumption
-                total_time_seconds += startup_duration
-                
-                # Log startup phase
-                simulation_log.append({
-                    "type": "startup",
-                    "duration_seconds": startup_duration,
-                    "consumption_kg": startup_consumption,
-                })
-                
-                if pellets_left <= 0:
-                    # Ran out during startup
-                    break
-                
-                # Simulate burning until next event
-                while pellets_left > 0:
-                    temp_delta = target_temp - sim_room_temp
-                    
-                    # === GET OUTDOOR TEMP FOR CURRENT SIMULATION TIME ===
-                    future_time = datetime.now() + timedelta(seconds=total_time_seconds)
-                    
-                    if forecast_available:
-                        forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
-                        
-                        # Fallback to current temp if forecast doesn't cover this time
-                        if forecast_temp is not None:
-                            outdoor_temp = forecast_temp
-                        else:
-                            outdoor_temp = self._get_external_temperature()
-                            if outdoor_temp is None:
-                                outdoor_temp = 0  # Final fallback
-                    else:
-                        # No forecast - use current external temp
-                        outdoor_temp = self._get_external_temperature()
-                        if outdoor_temp is None:
-                            outdoor_temp = 0  # Final fallback
-                    
-                    # Get heating rate (with current outdoor temp)
-                    heating_rate = self._get_heating_rate(
-                        heatlevel=sim_heatlevel,
-                        temp_delta=temp_delta,
-                        outdoor_temp=outdoor_temp,
-                    )
-                    
-                    # Get consumption rate (NO outdoor temp dependency)
-                    consumption_rate = self._get_consumption_rate(sim_heatlevel)
-                    
-                    if consumption_rate <= 0:
-                        # Can't predict without consumption data
-                        return {
-                            "status": "insufficient_data", 
-                            "learning_status": learning_status,
-                            "prediction_mode": "actual" if is_running else "hypothetical",
-                            "forecast_used": forecast_available,
-                            "forecast_horizon_hours": round(forecast_horizon_hours, 1) if forecast_available else 0,
-                        }
-                    
-                    # Calculate time to next event
-                    
-                    # Event 1: Check if level change needed after 10 minutes
-                    if time_at_current_level >= 10 * 60:
-                        # Predict temp after 10 minutes at current level
-                        temp_in_10min = sim_room_temp + (heating_rate * 10 / 60)
-                        temp_delta_in_10min = target_temp - temp_in_10min
-                        
-                        if temp_delta_in_10min > 0.5 and sim_heatlevel < 3:
-                            # Need to increase level
-                            time_to_event = 10 * 60
-                            next_event = "increase_level"
-                        elif temp_delta_in_10min < -0.5 and sim_heatlevel > 1:
-                            # Need to decrease level
-                            time_to_event = 10 * 60
-                            next_event = "decrease_level"
-                        else:
-                            # No level change, check for shutdown
-                            next_event = None
-                    else:
-                        # Must wait until 10 minutes at current level
-                        time_to_event = (10 * 60) - time_at_current_level
-                        next_event = "level_change_check"
-                    
-                    # Event 2: Shutdown temperature reached (only at level 1 after 10 min)
-                    if heating_rate > 0.05:  # Room is heating
-                        shutdown_temp = target_temp + shutdown_delta
-                        temp_to_gain = shutdown_temp - sim_room_temp
-                        
-                        if temp_to_gain > 0:
-                            time_to_shutdown_seconds = (temp_to_gain / heating_rate) * 3600
-                            
-                            # Only valid if at level 1 for 10+ minutes
-                            if sim_heatlevel == 1 and time_at_level_1 >= 10 * 60:
-                                if next_event is None or time_to_shutdown_seconds < time_to_event:
-                                    time_to_event = time_to_shutdown_seconds
-                                    next_event = "shutdown"
-                    else:
-                        # Not heating (or cooling) - continuous burn, no shutdown
-                        # Check if continuous burn condition
-                        if heating_rate <= 0.05 and next_event is None:
-                            # Will never reach shutdown - burns continuously
-                            time_to_empty_seconds = (pellets_left / consumption_rate) * 3600
-                            time_to_event = time_to_empty_seconds
-                            next_event = "pellets_empty"
-                    
-                    # Event 3: Pellets run out
-                    time_to_empty_seconds = (pellets_left / consumption_rate) * 3600
-                    
-                    if next_event is None or time_to_empty_seconds < time_to_event:
-                        time_to_event = time_to_empty_seconds
-                        next_event = "pellets_empty"
-                    
-                    # This ensures we recalculate with new forecast temps
-                    max_step_size = 3600  # 1 hour in seconds
-                    
-                    if time_to_event > max_step_size and next_event not in ["pellets_empty", "increase_level", "decrease_level", "level_change_check"]:
-                        # Take a 1-hour step, then recalculate
-                        actual_step = max_step_size
-                        step_event = "temp_update"
-                    else:
-                        # Step is short enough or is a definitive event
-                        actual_step = time_to_event
-                        step_event = next_event
-                    
-                    actual_step = max(0, actual_step)
-                    
-                    # Update state for this step
-                    start_temp_for_log = sim_room_temp
-                    sim_room_temp += (heating_rate * actual_step / 3600)
-                    pellets_consumed = consumption_rate * (actual_step / 3600)
-                    pellets_left -= pellets_consumed
-                    pellets_left = max(0, pellets_left)
-                    
-                    total_time_seconds += actual_step
-                    time_at_current_level += actual_step
-                    
-                    # Log this heating step
-                    simulation_log.append({
-                        "type": "heating",
-                        "heatlevel": sim_heatlevel,
-                        "duration_seconds": actual_step,
-                        "start_temp": start_temp_for_log,
-                        "end_temp": sim_room_temp,
-                        "outdoor_temp": outdoor_temp,
-                        "heating_rate": heating_rate,
-                        "consumption_rate": consumption_rate,
-                        "pellets_used": pellets_consumed,
-                        "pellets_remaining": pellets_left,
-                        "reason": step_event,
-                    })
-                    
-                    if sim_heatlevel == 1:
-                        time_at_level_1 += actual_step
-                    
-                    # Handle event
-                    if step_event == "pellets_empty" or pellets_left <= 0:
-                        # Done!
-                        break
-                    
-                    elif step_event == "temp_update":
-                        # Just a temperature update step, continue loop to recalculate
-                        continue
-                    
-                    elif step_event == "increase_level":
-                        old_level = sim_heatlevel
-                        sim_heatlevel = min(3, sim_heatlevel + 1)
-                        simulation_log.append({
-                            "type": "level_change",
-                            "old_level": old_level,
-                            "new_level": sim_heatlevel,
-                        })
-                        time_at_current_level = 0
-                        if sim_heatlevel == 1:
-                            time_at_level_1 = 0
-                        continue
-                    
-                    elif step_event == "decrease_level":
-                        old_level = sim_heatlevel
-                        sim_heatlevel = max(1, sim_heatlevel - 1)
-                        simulation_log.append({
-                            "type": "level_change",
-                            "old_level": old_level,
-                            "new_level": sim_heatlevel,
-                        })
-                        time_at_current_level = 0
-                        if sim_heatlevel == 1:
-                            time_at_level_1 = 0
-                        continue
-                    
-                    elif step_event == "level_change_check":
-                        # Just reached 10 minutes, check again
-                        continue
-                    
-                    elif step_event == "shutdown":
-                        # Enter waiting period
-                        sim_state = "waiting"
-                        sim_heatlevel = 1  # Will restart at level 1
-                        time_at_current_level = 0
-                        time_at_level_1 = 0
-                        break
-                
-                # If pellets empty, exit main loop
-                if pellets_left <= 0:
-                    break
-            
             # === WAITING PHASE ===
             if sim_state == "waiting":
-                # Calculate target restart temperature
                 restart_temp = target_temp - restart_delta
                 
-                # Simulate cooling in steps until restart temperature reached
+                # Cool down until restart temperature
                 while sim_room_temp > restart_temp and pellets_left > 0:
-                    # === GET OUTDOOR TEMP FOR CURRENT SIMULATION TIME ===
                     future_time = datetime.now() + timedelta(seconds=total_time_seconds)
                     
                     if forecast_available:
                         forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
-                        
-                        if forecast_temp is not None:
-                            outdoor_temp = forecast_temp
-                        else:
-                            outdoor_temp = self._get_external_temperature()
-                            if outdoor_temp is None:
-                                outdoor_temp = 0
+                        outdoor_temp = forecast_temp if forecast_temp is not None else self._get_external_temperature() or 0
                     else:
-                        outdoor_temp = self._get_external_temperature()
-                        if outdoor_temp is None:
-                            outdoor_temp = 0
+                        outdoor_temp = self._get_external_temperature() or 0
                     
-                    # Get cooling rate (with current outdoor temp)
-                    cooling_rate = self._get_cooling_rate(
-                        start_room_temp=sim_room_temp,
-                        outdoor_temp=outdoor_temp,
-                    )
-                    
-                    # Calculate time to reach restart temp at current cooling rate
+                    cooling_rate = self._get_cooling_rate(sim_room_temp, outdoor_temp)
                     temp_to_lose = sim_room_temp - restart_temp
                     
                     if temp_to_lose > 0 and cooling_rate > 0:
                         time_to_restart = (temp_to_lose / cooling_rate) * 3600
                     else:
-                        # Can't cool or already at restart temp
                         break
                     
-                    # Limit step size to 1 hour for temperature updates
-                    max_step_size = 3600  # 1 hour in seconds
+                    # Max 1 hour step
+                    actual_step = min(time_to_restart, 3600)
+                    temp_decrease = cooling_rate * (actual_step / 3600)
                     
-                    if time_to_restart > max_step_size:
-                        # Take a 1-hour step, then recalculate with new outdoor temp
-                        actual_step = max_step_size
-                        temp_decrease = cooling_rate * (actual_step / 3600)
-                    else:
-                        # Will reach restart temp within the hour
-                        actual_step = time_to_restart
-                        temp_decrease = temp_to_lose
-                    
-                    # Update state
                     start_temp_for_log = sim_room_temp
                     sim_room_temp -= temp_decrease
                     total_time_seconds += actual_step
                     
-                    # Log cooling step
                     simulation_log.append({
                         "type": "waiting",
                         "duration_seconds": actual_step,
@@ -2930,18 +2710,225 @@ class AduroCoordinator(DataUpdateCoordinator):
                         "restart_temp": restart_temp,
                     })
                     
-                    # Check if we've reached restart temperature
                     if sim_room_temp <= restart_temp:
-                        sim_room_temp = restart_temp  # Don't overshoot
+                        sim_room_temp = restart_temp
                         break
                 
-                # After waiting, restart at level 1
+                # Start next burn cycle at level 1
                 sim_state = "burning"
                 sim_heatlevel = 1
                 time_at_current_level = 0
                 time_at_level_1 = 0
+                cycles_count += 1
+                
+                # Startup consumption
+                pellets_left -= startup_consumption
+                total_time_seconds += startup_duration
+                
+                simulation_log.append({
+                    "type": "startup",
+                    "duration_seconds": startup_duration,
+                    "consumption_kg": startup_consumption,
+                })
+                
+                if pellets_left <= 0:
+                    break
+            
+            # === BURNING PHASE ===
+            if sim_state == "burning":
+                # Check conditions and decide what to do
+                future_time = datetime.now() + timedelta(seconds=total_time_seconds)
+                
+                if forecast_available:
+                    forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
+                    outdoor_temp = forecast_temp if forecast_temp is not None else self._get_external_temperature() or 0
+                else:
+                    outdoor_temp = self._get_external_temperature() or 0
+                
+                # Get current rates
+                temp_delta = target_temp - sim_room_temp
+                heating_rate = self._get_heating_rate(sim_heatlevel, temp_delta, outdoor_temp)
+                consumption_rate = self._get_consumption_rate(sim_heatlevel)
+                
+                # === CALCULATE TIME TO NEXT EVENT ===
+                next_event = None
+                time_to_event = 3600  # Default: 1 hour
+                
+                # Event 1: Shutdown check (only at HL1 after 10+ min)
+                if sim_heatlevel == 1 and time_at_level_1 >= 10 * 60:
+                    shutdown_temp = target_temp + shutdown_delta
+                    if sim_room_temp >= shutdown_temp:
+                        # Already at or above shutdown temp - shutdown now
+                        time_to_event = 0
+                        next_event = "shutdown"
+                    elif heating_rate > 0:
+                        # Calculate time to reach shutdown temp
+                        temp_to_gain = shutdown_temp - sim_room_temp
+                        if temp_to_gain > 0:
+                            time_to_shutdown = (temp_to_gain / heating_rate) * 3600
+                            if time_to_shutdown < time_to_event:
+                                time_to_event = time_to_shutdown
+                                next_event = "shutdown"
+                
+                # Event 2: Temperature threshold crossings (check if we'll cross during heating)
+                if time_at_current_level >= 10 * 60 and heating_rate != 0:
+                    # Decrease threshold: target + 0.5°C
+                    if sim_heatlevel > 1:
+                        decrease_threshold = target_temp + 0.5
+                        if heating_rate > 0 and sim_room_temp < decrease_threshold:
+                            # Heating toward decrease threshold
+                            temp_to_threshold = decrease_threshold - sim_room_temp
+                            time_to_threshold = (temp_to_threshold / heating_rate) * 3600
+                            if time_to_threshold < time_to_event:
+                                time_to_event = time_to_threshold
+                                next_event = "decrease_level"
+                    
+                    # Increase threshold: target - 0.5°C
+                    if sim_heatlevel < 3:
+                        increase_threshold = target_temp - 0.5
+                        if heating_rate < 0 and sim_room_temp > increase_threshold:
+                            # Cooling toward increase threshold (shouldn't happen but check anyway)
+                            temp_to_threshold = sim_room_temp - increase_threshold
+                            time_to_threshold = (temp_to_threshold / abs(heating_rate)) * 3600
+                            if time_to_threshold < time_to_event:
+                                time_to_event = time_to_threshold
+                                next_event = "increase_level"
+                
+                # Event 3: Level change check for current conditions (immediate)
+                if time_at_current_level >= 10 * 60:
+                    # Already too hot: decrease immediately
+                    if temp_delta < -0.5 and sim_heatlevel > 1:
+                        time_to_event = 0
+                        next_event = "decrease_level"
+                    
+                    # Already too cold: increase immediately
+                    elif temp_delta > 0.5 and sim_heatlevel < 3:
+                        time_to_event = 0
+                        next_event = "increase_level"
+                    
+                    # At HL1 and too hot: shutdown immediately
+                    elif sim_room_temp >= shutdown_temp and sim_heatlevel == 1:
+                        time_to_event = 0
+                        next_event = "shutdown"
+                
+                # Event 4: Pellets empty
+                if consumption_rate > 0:
+                    time_to_empty = (pellets_left / consumption_rate) * 3600
+                    if time_to_empty < time_to_event:
+                        time_to_event = time_to_empty
+                        next_event = "pellets_empty"
+                
+                # Event 5: Check again after 10 minutes if not there yet
+                if time_at_current_level < 10 * 60:
+                    time_to_check = (10 * 60) - time_at_current_level
+                    if time_to_check < time_to_event:
+                        time_to_event = time_to_check
+                        next_event = "level_check"
+                
+                # Limit step to 1 hour max (for forecast updates)
+                if time_to_event > 3600 and next_event not in ["pellets_empty", "decrease_level", "increase_level", "shutdown"]:
+                    time_to_event = 3600
+                    next_event = "temp_update"
+                
+                # === EXECUTE STEP ===
+                step_duration = max(0, time_to_event)
+                
+                start_temp = sim_room_temp
+                temp_change = heating_rate * (step_duration / 3600)
+                end_temp = sim_room_temp + temp_change
+                
+                # Check if we cross the decrease threshold during this step
+                # (This handles mid-step level changes for HL2 and HL3)
+                decrease_threshold = target_temp + 0.5
+                
+                if (sim_heatlevel > 1 and 
+                    time_at_current_level >= 10 * 60 and
+                    start_temp < decrease_threshold and 
+                    end_temp >= decrease_threshold and
+                    heating_rate > 0):
+                    # Will cross threshold during this step - calculate when
+                    temp_to_threshold = decrease_threshold - start_temp
+                    time_to_threshold = (temp_to_threshold / heating_rate) * 3600
+                    
+                    # Only take step up to threshold
+                    if time_to_threshold < step_duration:
+                        step_duration = time_to_threshold
+                        temp_change = heating_rate * (step_duration / 3600)
+                        end_temp = start_temp + temp_change
+                        next_event = "decrease_level"
+                
+                sim_room_temp = end_temp
+                
+                pellets_consumed = consumption_rate * (step_duration / 3600)
+                pellets_left -= pellets_consumed
+                pellets_left = max(0, pellets_left)
+                
+                total_time_seconds += step_duration
+                time_at_current_level += step_duration
+                if sim_heatlevel == 1:
+                    time_at_level_1 += step_duration
+                
+                # Log this step
+                simulation_log.append({
+                    "type": "heating",
+                    "heatlevel": sim_heatlevel,
+                    "duration_seconds": step_duration,
+                    "start_temp": start_temp,
+                    "end_temp": sim_room_temp,
+                    "outdoor_temp": outdoor_temp,
+                    "heating_rate": heating_rate,
+                    "consumption_rate": consumption_rate,
+                    "pellets_used": pellets_consumed,
+                    "pellets_remaining": pellets_left,
+                    "reason": next_event or "continue",
+                })
+                
+                # === HANDLE EVENT ===
+                if next_event == "pellets_empty" or pellets_left <= 0:
+                    break
+                
+                elif next_event == "shutdown":
+                    sim_state = "waiting"
+                    continue
+                
+                elif next_event == "decrease_level":
+                    old_level = sim_heatlevel
+                    sim_heatlevel -= 1
+                    time_at_current_level = 0
+                    if sim_heatlevel == 1:
+                        time_at_level_1 = 0
+                    
+                    simulation_log.append({
+                        "type": "level_change",
+                        "old_level": old_level,
+                        "new_level": sim_heatlevel,
+                    })
+                    continue
+                
+                elif next_event == "increase_level":
+                    old_level = sim_heatlevel
+                    sim_heatlevel += 1
+                    time_at_current_level = 0
+                    
+                    simulation_log.append({
+                        "type": "level_change",
+                        "old_level": old_level,
+                        "new_level": sim_heatlevel,
+                    })
+                    continue
+                
+                elif next_event == "level_check":
+                    # Just reached 10 minutes, loop again to check conditions
+                    continue
+                
+                elif next_event == "temp_update":
+                    # Took a 1-hour step, continue to next iteration
+                    continue
+                
+                # Default: continue burning
+                continue
         
-        # Format results
+        # Build result
         depletion_datetime = datetime.now() + timedelta(seconds=total_time_seconds)
         
         confidence = self._calculate_confidence_level(

@@ -135,7 +135,8 @@ The system automatically learns from your stove's operation by tracking:
 - ***Status Messages:***
    - "Insufficient data" - Still learning (need 10hrs+ per heat level, 5+ waiting periods)
    - "Empty" - No pellets remaining
-   - "N/A" - Stove off or in wood mode
+   - "N/A" - Stove in wood mode
+   - "2026-01-17 23:30 (if started)" - Stove is off
 
 ***Sensor Attributes***
 - Time remaining (hours)

@@ -1635,8 +1635,8 @@ class AduroPelletDepletionSensor(AduroSensorBase):
                 # Format as "2026-01-17 23:30"
                 formatted = depletion_dt.strftime("%Y-%m-%d %H:%M")
                 # Add suffix if hypothetical
-                if prediction_mode == "hypothetical":
-                    return f"{formatted} (if started)"
+                #if prediction_mode == "hypothetical":
+                #    return f"{formatted} (if started)"
                 return formatted
             return "Unknown"
         

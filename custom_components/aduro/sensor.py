@@ -1609,34 +1609,66 @@ class AduroPelletDepletionSensor(AduroSensorBase):
         """Initialize the sensor."""
         super().__init__(coordinator, entry, "pellet_depletion", "pellet_depletion")
         self._attr_icon = "mdi:clock-alert-outline"
+        self._translations = {}
+        self._translations_loaded = False
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        await self._load_translations()
+
+    async def _load_translations(self) -> None:
+        """Load translations for the current language."""
+        try:
+            language = self.hass.config.language
+            self._translations = await trans_helper.async_get_translations(
+                self.hass,
+                language,
+                "entity",
+                {DOMAIN},
+            )
+            self._translations_loaded = True
+            _LOGGER.debug("Loaded translations for language: %s", language)
+        except Exception as err:
+            _LOGGER.warning("Failed to load translations: %s", err)
+            self._translations_loaded = False
+
+    def _get_translated_text(self, translation_key: str) -> str:
+        """Get translated text for a key."""
+        full_key = f"component.{DOMAIN}.entity.sensor.pellet_depletion.state.{translation_key}"
+
+        if self._translations_loaded and full_key in self._translations:
+            return self._translations[full_key]
+
+        # Fallback to plain key name
+        return translation_key
 
     @property
     def native_value(self) -> str | None:
         """Return the datetime when pellets will be depleted."""
         prediction = self.coordinator.predict_pellet_depletion()
-        
+
         if not prediction:
-            return "N/A"
-        
+            return self._get_translated_text("unavailable")
+
         status = prediction.get("status")
-        
+
         if status == "wood_mode":
-            return prediction.get("message", "N/A - In wood mode")
+            return self._get_translated_text("wood_mode")
         elif status == "insufficient_data":
-            return "Insufficient data"
+            return self._get_translated_text("insufficient_data")
         elif status == "empty":
-            return "Empty"
+            return self._get_translated_text("empty")
         elif status == "ok":
             depletion_dt = prediction.get("depletion_datetime")
-            prediction_mode = prediction.get("prediction_mode", "actual")
-            
+
             if depletion_dt:
                 # Format as "2026-01-17 23:30"
-                formatted = depletion_dt.strftime("%Y-%m-%d %H:%M")
-                return formatted
-            return "Unknown"
-        
-        return "N/A"
+                return depletion_dt.strftime("%Y-%m-%d %H:%M")
+
+            return self._get_translated_text("unknown")
+
+        return self._get_translated_text("unavailable")
 
     @property
     def icon(self) -> str:
@@ -1679,6 +1711,7 @@ class AduroPelletDepletionSensor(AduroSensorBase):
                 "learning_sufficient_data": learning_status.get("sufficient_data", False),
                 "learning_total_heating_obs": learning_status.get("total_heating_observations", 0),
                 "learning_total_cooling_obs": learning_status.get("total_cooling_observations", 0),
+                "learning_total_consumption_obs": learning_status.get("total_consumption_observations", 0),
             }
 
             # Add learning consumption tracker info

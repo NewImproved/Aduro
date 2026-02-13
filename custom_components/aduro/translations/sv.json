@@ -36,8 +36,8 @@
         "data": {
           "stove_model": "Kaminmodell",
           "stove_ip": "Fast IP Address (Valfritt)",
-          "external_temp_sensor": "Extern Temperatur Sensor (Rekomenderat)",
-          "weather_forecast_sensor": "Sensor för tim-baserade väderprognoser (Rekomenderat)"
+          "external_temp_sensor": "Extern Temperatur Sensor (Valfritt)",
+          "weather_forecast_sensor": "Sensor för tim-baserade väderprognoser (Recommeded)"
         },
         "data_description": {
           "stove_ip": "Lämna tom för automatisk anslutning, eller fyll i för fast IP-adress",
@@ -289,7 +289,14 @@
         "name": "Kolmonoxidnivå röd"
       },
       "pellet_depletion": {
-        "name": "Tid för tomt pelletsförråd"
+        "name": "Tid för tomt pelletsförråd",
+        "state": {
+          "wood_mode": "Vedeldning",
+          "insufficient_data": "Otillräcklig data",
+          "empty": "Förråd tomt",
+          "unknown": "Okänt",
+          "unavailable": "N/A"
+        }
       }
     },
     "switch": {

@@ -197,6 +197,8 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._forecast_data: list[dict[str, Any]] = []
         self._forecast_last_updated: datetime | None = None
         self._forecast_update_interval = timedelta(hours=1)
+        self._forecast_startup_delay = timedelta(minutes=2)  # Wait for other integrations
+        self._ha_started_at: datetime = datetime.now()
 
         # Timer tracking
         self._timer_startup_1_started: datetime | None = None
@@ -1862,6 +1864,16 @@ class AduroCoordinator(DataUpdateCoordinator):
             if (self._forecast_last_updated is not None and 
                 (now - self._forecast_last_updated) < self._forecast_update_interval):
                 # Cache is still fresh
+                return
+            
+            # Wait for startup delay to allow other integrations to load
+            time_since_start = datetime.now() - self._ha_started_at
+            if time_since_start < self._forecast_startup_delay:
+                remaining = (self._forecast_startup_delay - time_since_start).total_seconds()
+                _LOGGER.debug(
+                    "Waiting %.0f more seconds before fetching forecast (startup delay)",
+                    remaining
+                )
                 return
             
             _LOGGER.debug("Updating weather forecast cache from %s", self._weather_forecast_sensor)

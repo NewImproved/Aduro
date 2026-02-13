@@ -286,7 +286,14 @@
         "name": "Carbon monoxide level red"
       },
       "pellet_depletion": {
-        "name": "Time for empty pellets stove"
+        "name": "Pellet Depletion",
+        "state": {
+          "wood_mode": "Wood mode active",
+          "insufficient_data": "Insufficient data",
+          "empty": "Empty",
+          "unknown": "Unknown",
+          "unavailable": "N/A"
+        }
       }
     },
     "switch": {

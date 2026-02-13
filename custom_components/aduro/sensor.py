@@ -1625,8 +1625,7 @@ class AduroPelletDepletionSensor(AduroSensorBase):
         elif status == "insufficient_data":
             return "Insufficient data"
         elif status == "empty":
-            suffix = " (if started)" if prediction.get("prediction_mode") == "hypothetical" else ""
-            return f"Empty{suffix}"
+            return "Empty"
         elif status == "ok":
             depletion_dt = prediction.get("depletion_datetime")
             prediction_mode = prediction.get("prediction_mode", "actual")
@@ -1634,9 +1633,6 @@ class AduroPelletDepletionSensor(AduroSensorBase):
             if depletion_dt:
                 # Format as "2026-01-17 23:30"
                 formatted = depletion_dt.strftime("%Y-%m-%d %H:%M")
-                # Add suffix if hypothetical
-                #if prediction_mode == "hypothetical":
-                #    return f"{formatted} (if started)"
                 return formatted
             return "Unknown"
         

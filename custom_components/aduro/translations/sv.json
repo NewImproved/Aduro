@@ -20,7 +20,9 @@
       "missing_pin": "PIN-kod krävs",
       "invalid_ip": "Ogiltigt format för IP adress",
       "cannot_connect": "Kunde inte ansluta",
-      "unknown": "Oväntat fel"
+      "unknown": "Oväntat fel",
+      "sensor_not_found": "Sensor inte hittad",
+      "not_weather_entity": "Ingen väder entitet"
     },
     "abort": {
       "already_configured": "Denna kamin är redan konfigurerad"
@@ -33,10 +35,14 @@
         "description": "Välj ett konfigurationsområde",
         "data": {
           "stove_model": "Kaminmodell",
-          "stove_ip": "Fast IP Address (Valfritt)"
+          "stove_ip": "Fast IP Address (Valfritt)",
+          "external_temp_sensor": "Extern Temperatur Sensor (Rekommenderat)",
+          "weather_forecast_sensor": "Sensor för timmes-baserade väderprognoser (Rekommenderat)"
         },
         "data_description": {
-          "stove_ip": "Lämna tom för automatisk anslutning, eller fyll i för fast IP-adress"
+          "stove_ip": "Lämna tom för automatisk anslutning, eller fyll i för fast IP-adress",
+          "external_temp_sensor": "Välj utomhustemperatursensor för att förbättra beräkning kring tid när all pellets är förbrukad.",
+          "weather_forecast_sensor": "Välj sensor för att öka precision på sensor som beräknar tid för tomt pelletsförråd"
         },
         "menu_options": {
           "pellet_settings": "Pelletsinställningar",
@@ -86,6 +92,9 @@
           "auto_resume_after_wood": "Återuppta pelletsdrift automatiskt med tidigare inställningar när vedläget avslutas"
         }
       }
+    },
+    "error": {
+        "sensor_not_found": "Vald sensor hittades inte. Kontrollera entity ID."
     }
   },
   "entity": {
@@ -278,6 +287,16 @@
       },
       "carbon_monoxide_red": {
         "name": "Kolmonoxidnivå röd"
+      },
+      "pellet_depletion": {
+        "name": "Tid för tomt pelletsförråd",
+        "state": {
+          "wood_mode": "Vedeldning",
+          "insufficient_data": "Otillräcklig data",
+          "empty": "Förråd tomt",
+          "unknown": "Okänt",
+          "unavailable": "N/A"
+        }
       }
     },
     "switch": {

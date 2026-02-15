@@ -29,14 +29,18 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configurer poêle Aduro",
-        "description": "Mise à jour des paramétres du poêle",
+        "title": "Configurer le poêle Aduro",
+        "description": "Mise à jour des paramètres du poêle",
         "data": {
           "stove_model": "Modèle du poêle",
-          "stove_ip": "Adresse IP fixe (Optionnel)"
+          "stove_ip": "Adresse IP fixe (optionnel)",
+          "external_temp_sensor": "Capteur de température extérieure (recommandé)",
+          "weather_forecast_sensor": "Capteur de prévisions météorologiques horaires (recommandé)"
         },
         "data_description": {
-          "stove_ip": "Laisser vide pour la découverte automatique ou entrer une adresse IP fixe"
+          "stove_ip": "Laisser vide pour la découverte automatique ou entrer une adresse IP fixe",
+          "external_temp_sensor": "Ajouter un capteur pour fournir de meilleures données d’apprentissage au capteur de consommation de pellets",
+          "weather_forecast_sensor": "Ajouter un capteur pour augmenter la précision du capteur de consommation de pellets"
         },
         "menu_options": {
           "pellet_settings": "Paramètres Pellet",
@@ -278,6 +282,16 @@
       },
       "carbon_monoxide_red": {
         "name": "Niveau d'alerte CO (rouge)"
+      },
+      "pellet_depletion": {
+        "name": "Consommation de granulés",
+        "state": {
+          "wood_mode": "Mode bois actif",
+          "insufficient_data": "Données insuffisantes",
+          "empty": "Vide",
+          "unknown": "Inconnu",
+          "unavailable": "N/D"
+        }
       }
     },
     "switch": {

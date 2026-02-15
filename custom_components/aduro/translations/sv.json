@@ -36,8 +36,8 @@
         "data": {
           "stove_model": "Kaminmodell",
           "stove_ip": "Fast IP Address (Valfritt)",
-          "external_temp_sensor": "Extern Temperatur Sensor (Valfritt)",
-          "weather_forecast_sensor": "Sensor för tim-baserade väderprognoser (Recommeded)"
+          "external_temp_sensor": "Extern Temperatur Sensor (Rekommenderat)",
+          "weather_forecast_sensor": "Sensor för timmes-baserade väderprognoser (Rekommenderat)"
         },
         "data_description": {
           "stove_ip": "Lämna tom för automatisk anslutning, eller fyll i för fast IP-adress",

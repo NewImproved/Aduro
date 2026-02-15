@@ -33,10 +33,14 @@
         "description": "Ofeneinstellungen aktualisieren",
         "data": {
           "stove_model": "Ofenmodell",
-          "stove_ip": "Feste IP-Adresse (optional)"
+          "stove_ip": "Feste IP-Adresse (optional)",
+          "external_temp_sensor": "Sensor für Außentemperatur (empfohlen)",
+          "weather_forecast_sensor": "Sensor für stündliche Wettervorhersagen (empfohlen)"
         },
         "data_description": {
-          "stove_ip": "Leer lassen für automatische Erkennung oder eine feste IP-Adresse eingeben"
+          "stove_ip": "Leer lassen für automatische Erkennung oder eine feste IP-Adresse eingeben",
+          "external_temp_sensor": "Sensor hinzufügen, um bessere Lerndaten für den Pelletverbrauchssensor zu erhalten",
+          "weather_forecast_sensor": "Sensor hinzufügen, um die Genauigkeit des Pelletverbrauchssensors zu erhöhen"
         },
         "menu_options": {
           "pellet_settings": "Pelleteinstellungen",
@@ -271,6 +275,16 @@
       },
       "carbon_monoxide_red": {
         "name": "Kohlenmonoxidniveau Rot"
+      },
+      "pellet_depletion": {
+        "name": "Pelletverbrauch",
+        "state": {
+          "wood_mode": "Holzmodus aktiv",
+          "insufficient_data": "Unzureichende Daten",
+          "empty": "Leer",
+          "unknown": "Unbekannt",
+          "unavailable": "N/V"
+        }
       }
     },
     "switch": {

@@ -33,10 +33,14 @@
         "description": "Opdater indstillinger",
         "data": {
           "stove_model": "Model",
-          "stove_ip": "Fast IP adresse (frivilligt)"
+          "stove_ip": "Fast IP-adresse (frivilligt)",
+          "external_temp_sensor": "Sensor til udetemperatur (anbefales)",
+          "weather_forecast_sensor": "Sensor til timebaserede vejrudsigter (anbefales)"
         },
         "data_description": {
-          "stove_ip": "Efterlad tomt for at automatisk finde brændeovnen, eller indtast en fast IP adresse"
+          "stove_ip": "Efterlad tomt for automatisk at finde brændeovnen, eller indtast en fast IP-adresse",
+          "external_temp_sensor": "Tilføj sensor for at give bedre læringsdata til pilleforbrugssensoren",
+          "weather_forecast_sensor": "Tilføj sensor for at øge præcisionen for pilleforbrugssensoren"
         },
         "menu_options": {
           "pellet_settings": "Indstillinger for piller",
@@ -277,6 +281,16 @@
       },
       "carbon_monoxide_red": {
         "name": "Kulmonoxidniveau rød"
+      },
+      "pellet_depletion": {
+        "name": "Pilleforbrug",
+        "state": {
+          "wood_mode": "Trætilstand aktiv",
+          "insufficient_data": "Utilstrækkelige data",
+          "empty": "Tom",
+          "unknown": "Ukendt",
+          "unavailable": "N/A"
+        }
       }
     },
     "switch": {

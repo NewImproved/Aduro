@@ -85,7 +85,7 @@ The system automatically learns from your stove's operation by tracking:
 - Records when heat levels change
 - Records when stove stops/starts
 - Filters out user-interrupted cycles (only learns automatic behavior)
-- Filters out steep heat changes (i.e. if you open a door right beside the stove)
+- Filters out abnormal heat changes (i.e. if you open a door right beside the stove)
 - Handles midnight consumption reset automatically
 - Stores all data persistently across restarts
 
@@ -154,12 +154,13 @@ The system automatically learns from your stove's operation by tracking:
    - Shutdown/restart observation counts
 
 ### Key Features
-- ***Optional External Sensor*** - Improved accuracy with outdoor temperature sensor
-- ***Optional Weather forecast Sensor*** - Improved accuracy with hourly temperature forecast sensor
+- ***Optional External Sensor (Recommended)*** - Improved accuracy with outdoor temperature sensor
+- ***Optional Weather forecast Sensor (Recommended)*** - Improved accuracy with hourly temperature forecast sensor
 - ***Fully Automatic*** - No configuration needed, learns while you use the stove
 - ***Adapts to Your Home*** - Learns your specific heating patterns and conditions
 - ***Handles Midnight*** - Consumption tracking works across midnight resets
 - ***Filters User Behavior*** - Only learns automatic stove behavior, not manual interventions
+- ***Filters out abnormal heat changes*** - For example, if you open a door right beside the stove
 - ***Persistent*** - All learning data saved and restored across restarts
 - ***Multi-Condition*** - Learns different consumption rates for different temperatures and conditions
 - ***Real-Time Updates*** - Predictions update as conditions change

@@ -162,7 +162,7 @@ The system automatically learns from your stove's operation by tracking:
 - ***Filters User Behavior*** - Only learns automatic stove behavior, not manual interventions
 - ***Filters out abnormal heat changes*** - For example, if you open a door right beside the stove
 - ***Persistent*** - All learning data saved and restored across restarts
-- ***Multi-Condition*** - Learns different consumption rates for different temperatures and conditions
+- ***Multi-Condition*** - Learns different heating- and cooling-rates for different temperatures and conditions
 - ***Real-Time Updates*** - Predictions update as conditions change
 
 

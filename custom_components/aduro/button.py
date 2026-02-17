@@ -32,6 +32,7 @@ async def async_setup_entry(
         AduroToggleModeButton(coordinator, entry),
         AduroResumeAfterWoodButton(coordinator, entry),
         AduroForceAugerButton(coordinator, entry),
+        AduroResetAlarmButton(coordinator, entry),
     ]
 
     async_add_entities(buttons)
@@ -371,7 +372,6 @@ class AduroForceAugerButton(AduroButtonBase):
         """Initialize the button."""
         super().__init__(coordinator, entry, "force_auger", "force_auger")
         self._attr_icon = "mdi:cog-play"
-        self._attr_entity_category = EntityCategory.CONFIG
 
     async def async_press(self) -> None:
         """Handle button press."""
@@ -385,3 +385,25 @@ class AduroForceAugerButton(AduroButtonBase):
             await self.coordinator.async_request_refresh()
         else:
             _LOGGER.error("Button: Failed to force auger")
+
+
+class AduroResetAlarmButton(AduroButtonBase):
+    """Button to reset alarm."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the button."""
+        super().__init__(coordinator, entry, "reset_alarm", "reset_alarm")
+        self._attr_icon = "mdi:alarm-light-off"
+
+    async def async_press(self) -> None:
+        """Handle button press."""
+        _LOGGER.info("Button: reset alarm")
+        
+        success = await self.coordinator.async_reset_alarm()
+        
+        if success:
+            _LOGGER.info("Button: Alarm reset successfully")
+            # Request immediate update
+            await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.error("Button: Failed to reset alarm")

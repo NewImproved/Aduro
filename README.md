@@ -341,6 +341,7 @@ The integration will automatically:
 - **Power** - Start/Stop the stove
 - **Auto Shutdown at Low Pellets** - Enable automatic shutdown at a certain pellets level and time
 - **Auto Resume After Wood Mode** - Enable automatic resume when in heat level mode. Activates when the smoke temperature drops below 120°C.
+- **Forced fan** - Runs fan until either smoke temp exceeds 320°C or the set time is exceeded.
 
 ### Numbers (9)
 
@@ -359,6 +360,9 @@ The integration will automatically:
 - **Low Wood Temp Alert Threshold** - Alert threshold (20-200°C)
 - **Low Wood Temp Alert Duration threshold** - Alert duration threshold (10-1800 seconds)
 
+#### Forced Fan Configuration
+- **Forced fan duration** - Fan duration threshold (1-900 seconds)
+- 
 ### Buttons (5)
 
 - **Refill Pellets** - Mark pellets as refilled

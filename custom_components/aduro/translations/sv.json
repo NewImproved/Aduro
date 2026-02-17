@@ -308,6 +308,9 @@
       },
       "auto_resume_after_wood_mode": {
         "name": "Automatisk Återstart Efter Vedläge"
+      },
+      "force_fan": {
+        "name": "Tvinga fläkt"
       }
     },
     "number": {
@@ -327,16 +330,19 @@
         "name": "Automatisk Avstängnings Pelletsnivå"
       },
       "high_smoke_temp_threshold": {
-        "name": "Tröskelvärde för Hög Röktemperatur (°C)"
+        "name": "Tröskelvärde för Hög Röktemperatur"
       },
       "high_smoke_duration_threshold": {
-        "name": "Varaktighet för Hög Rökvarning (sekunder)"
+        "name": "Varaktighet för Hög Rökvarning"
       },
       "low_wood_temp_threshold": {
-        "name": "Tröskelvärde för Låg Vedlägestemperatur (°C)"
+        "name": "Tröskelvärde för Låg Vedlägestemperatur"
       },
       "low_wood_duration_threshold": {
-        "name": "Varaktighet för Låg Vedlägesvarning (sekunder)"
+        "name": "Varaktighet för Låg Vedlägesvarning"
+      },
+     "force_fan_max_duration": {
+        "name": "Max varaktighet för tvingad fläkt"
       }
     },
     "button": {
@@ -354,6 +360,9 @@
       },
       "force_auger": {
         "name": "Tvinga Skruv"
+      },
+      "reset_alarm": {
+        "name": "Återställ Alarm"
       }
     }
   },

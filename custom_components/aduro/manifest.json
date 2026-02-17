@@ -8,5 +8,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/NewImproved/Aduro/issues",
   "requirements": ["pyduro"],
-  "version": "2026.2.4"
+  "version": "2026.2.5-beta"
 }

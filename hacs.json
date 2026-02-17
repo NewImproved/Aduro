@@ -1,7 +1,7 @@
 {
   "name": "Aduro Hybrid Stove",
   "filename": "aduro.zip",
-  "content_in_root": false,
+  "content_in_root": true,
   "render_readme": true,
   "homeassistant": "2023.1.0",
   "zip_release": true

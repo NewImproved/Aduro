@@ -77,8 +77,8 @@ The system automatically learns from your stove's operation by tracking:
 ***3. Cooling/Waiting Periods (Temperature Mode Only)***
 
 - Room cooling rates during waiting
-- Shutdown threshold (how far above target before stove stops)
-- Restart threshold (how far below target before stove restarts)
+- Shutdown threshold (how far above target before stove stops) - saved but currently not used for calculation.
+- Restart threshold (how far below target before stove restarts) - saved but currently not used for calculation.
 
 
 

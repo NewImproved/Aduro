@@ -1,8 +1,8 @@
-[![GitHub release](https://img.shields.io/github/release/NewImproved/Aduro.svg)](https://github.com/NewImproved/Aduro/releases)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=W6WPMAQ3YKK6G)
-![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/NewImproved/Aduro/latest/total)
+[![GitHub release](https://img.shields.io/github/release/NewImproved/Aduro.svg)](https://github.com/NewImproved/Aduro/releases)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NewImproved/Aduro/total)
-![GitHub Downloads](https://img.shields.io/github/downloads-pre/NewImproved/Aduro/total)
+![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/NewImproved/Aduro/latest/total)
+
 
 # Aduro Hybrid Stove Integration for Home Assistant
 A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 and H6 unconfirmed] hybrid pellet stoves.

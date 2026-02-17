@@ -370,6 +370,7 @@ The integration will automatically:
 - **Toggle Mode** - Switch between Heat Level/Temperature modes
 - **Resume After Wood Mode** - Manual resume from wood mode
 - **Force Auger** - Manually run auger (advanced)
+- **Alert Reset** - Resets Alerts
 
 ## Services
 

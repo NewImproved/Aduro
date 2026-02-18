@@ -5,7 +5,7 @@
 
 
 # Aduro Hybrid Stove Integration for Home Assistant
-A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 and H6 unconfirmed] hybrid pellet stoves.
+A comprehensive Home Assistant custom integration for Aduro H1, H2, H3, H5 [H4 and H6 unconfirmed] hybrid pellet stoves.
 
 
 ## Features
@@ -191,9 +191,9 @@ Before showing predictions, the system needs:
 - Configurations, user settings and some sensors are saved on file to survive restarts and upgrades.
 
 ## Supported Models
-Only Aduro H1, H2 & H5 have been confirmed to work with the integration.
+Only Aduro H1, H2, H3 & H5 have been confirmed to work with the integration.
 
-Asumptions have been made for Aduro H3, H4 and H6. They are not yet confirmed.
+Asumptions have been made for Aduro H4 and H6. They are not yet confirmed.
 If you can confirm that the integration work for a stove, please let me know via [GitHub Issues](https://github.com/NewImproved/Aduro/issues).
 
 

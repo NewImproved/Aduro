@@ -3126,6 +3126,10 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Calculate time for room to cool to target temperature
         
         if sim_room_temp > target_temp:
+            _LOGGER.debug(
+                "Pellets empty at %.1f°C (target: %.1f°C) - calculating residual heat dissipation",
+                sim_room_temp, target_temp
+            )
             # Room is warmer than target - will continue providing useful heat
             # Calculate cooling time to target temperature
             
@@ -3191,6 +3195,12 @@ class AduroCoordinator(DataUpdateCoordinator):
                 (total_time_seconds - (total_time_seconds - actual_step)) / 60
             )
         
+        else:
+            _LOGGER.debug(
+                "Pellets empty at %.1f°C (target: %.1f°C) - no residual heat, ending immediately",
+                sim_room_temp, target_temp
+            )
+
         # Format results
         depletion_datetime = datetime.now() + timedelta(seconds=total_time_seconds)
         

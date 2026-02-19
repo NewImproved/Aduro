@@ -3121,7 +3121,77 @@ class AduroCoordinator(DataUpdateCoordinator):
                 # Default: continue burning
                 continue
         
-        # Build result
+        # === SIMULATION ENDED - ADD RESIDUAL HEAT DISSIPATION ===
+        # The stove is out of pellets, but the room is still warm
+        # Calculate time for room to cool to target temperature
+        
+        if sim_room_temp > target_temp:
+            # Room is warmer than target - will continue providing useful heat
+            # Calculate cooling time to target temperature
+            
+            # Get outdoor temp at current simulation time
+            future_time = datetime.now() + timedelta(seconds=total_time_seconds)
+            
+            if forecast_available:
+                forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
+                if forecast_temp is not None:
+                    outdoor_temp = forecast_temp
+                else:
+                    outdoor_temp = self._get_external_temperature()
+                    if outdoor_temp is None:
+                        outdoor_temp = 0
+            else:
+                outdoor_temp = self._get_external_temperature()
+                if outdoor_temp is None:
+                    outdoor_temp = 0
+            
+            # Calculate cooling in hourly steps until target reached
+            while sim_room_temp > target_temp:
+                # Get cooling rate
+                cooling_rate = self._get_cooling_rate(
+                    start_room_temp=sim_room_temp,
+                    outdoor_temp=outdoor_temp,
+                )
+                
+                if cooling_rate <= 0:
+                    # No cooling happening (shouldn't happen, but safety check)
+                    break
+                
+                # Calculate time to reach target temp
+                temp_to_lose = sim_room_temp - target_temp
+                time_to_target = (temp_to_lose / cooling_rate) * 3600
+                
+                # Limit step to 1 hour for forecast updates
+                max_step_size = 3600
+                if time_to_target > max_step_size:
+                    actual_step = max_step_size
+                    temp_decrease = cooling_rate * (actual_step / 3600)
+                else:
+                    actual_step = time_to_target
+                    temp_decrease = temp_to_lose
+                
+                # Update state
+                sim_room_temp -= temp_decrease
+                total_time_seconds += actual_step
+                
+                # Check if reached target
+                if sim_room_temp <= target_temp:
+                    sim_room_temp = target_temp
+                    break
+                
+                # Update outdoor temp for next step
+                future_time = datetime.now() + timedelta(seconds=total_time_seconds)
+                if forecast_available:
+                    forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
+                    if forecast_temp is not None:
+                        outdoor_temp = forecast_temp
+            
+            _LOGGER.debug(
+                "Added residual heat dissipation: %.1f minutes to cool to target",
+                (total_time_seconds - (total_time_seconds - actual_step)) / 60
+            )
+        
+        # Format results
         depletion_datetime = datetime.now() + timedelta(seconds=total_time_seconds)
         
         confidence = self._calculate_confidence_level(
@@ -3130,7 +3200,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             cycles_predicted=cycles_count,
         )
         
-        result = {
+        return {
             "time_remaining_seconds": int(total_time_seconds),
             "time_remaining_formatted": self._format_time_remaining(int(total_time_seconds)),
             "depletion_datetime": depletion_datetime,
@@ -3145,6 +3215,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             "prediction_mode": "actual" if is_running else "hypothetical",
             "forecast_used": forecast_available,
             "forecast_horizon_hours": round(forecast_horizon_hours, 1) if forecast_available else 0,
+            "residual_heat_included": sim_room_temp > target_temp, 
         }
         
         # Check if prediction changed significantly and log details
@@ -3806,9 +3877,12 @@ class AduroCoordinator(DataUpdateCoordinator):
             await self.async_stop_force_fan(reason="error")
 
     def set_force_fan_max_duration(self, duration: int) -> None:
-        """Set force fan maximum duration (minutes)."""
-        duration = self._force_fan_max_duration * 60
-        _LOGGER.info("Force fan max duration set to: %d minutes", duration)
+        """Set force fan maximum duration in seconds."""
+        self._force_fan_max_duration = duration
+        _LOGGER.info(
+            "Force fan max duration set to: %d seconds",
+            duration
+        )
         asyncio.create_task(self.async_save_pellet_data())
 
     async def async_set_custom(self, path: str, value: Any) -> bool:

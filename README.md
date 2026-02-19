@@ -110,6 +110,7 @@ The system automatically learns from your stove's operation by tracking:
 - Predicts multiple cycles until pellets run out
 - Accounts for stove's automatic level adjustments every 10+ minutes
 - Updates the calculation with the forecasted temperature for each hour into the simulation
+- If the simulation ends where the room temperature is above target temperature, the simulation calculates a cooling period for the room temperature to cool down to the target temperature. This is to avoid big jumps in depletion times, where the calculation switches between adding another waiting period or burning through all pellets before reaching the waiting period.
 
 ### Prediction Accuracy
 

@@ -20,7 +20,9 @@
       "missing_pin": "PIN ist erforderlich",
       "invalid_ip": "Ungültiges IP-Adressformat",
       "cannot_connect": "Verbindung fehlgeschlagen",
-      "unknown": "Unerwarteter Fehler"
+      "unknown": "Unerwarteter Fehler",
+      "sensor_not_found": "Sensor nicht gefunden",
+      "not_weather_entity": "Keine Wettereinheit"
     },
     "abort": {
       "already_configured": "Dieser Ofen ist bereits konfiguriert"
@@ -94,10 +96,10 @@
   },
   "entity": {
     "sensor": {
-      "state_disp": {
+      "state": {
         "name": "Zustand",
         "state": {
-          "state_operating": "Leistung {heatlevel}",
+          "state_operating": "Leistung {heatlevel_roman}",
           "state_operating_startup": "Leistung",
           "state_stopped": "Gestoppt",
           "state_off": "Aus",
@@ -128,7 +130,8 @@
           "substate_no_fuel": "Kein Brennstoff",
           "substate_luke_offen": "Luke offen",
           "substate_heating_up": "Aufheizen",
-          "substate_check_burn_cup": "Brennertopf prüfen"
+          "substate_check_burn_cup": "Brennertopf prüfen",
+          "substate_dropshaft_hot": "Fallschacht heiß"
         }
       },
       "consumption_since_cleaning": {
@@ -248,7 +251,7 @@
         "name": "Änderung wird durchgeführt"
       },
       "display_format": {
-        "name": "Visningsformat",
+        "name": "Anzeigeformat",
         "state_attributes": {
           "heatlevel_format": {
             "name": "Heizstufe (Raumtemp.): {display_target} ({current_temperature})°C"
@@ -266,6 +269,12 @@
       },
       "app_change_detected": {
         "name": "Externe Änderung erkannt"
+      },
+      "high_smoke_temp_alert": {
+        "name": "Warnung vor hoher Rauchtemperatur"
+      },
+      "low_wood_temp_alert": {
+        "name": "Warnung bei niedriger Holztemperatur"
       },
       "carbon_monoxide": {
         "name": "Kohlenmonoxidniveau"
@@ -296,6 +305,9 @@
       },
       "auto_resume_after_wood_mode": {
         "name": "Automatische Wiederaufnahme nach Holzmodus"
+      },
+      "force_fan": {
+        "name": "Lüfter erzwingen"
       }
     },
     "number": {
@@ -326,11 +338,8 @@
       "low_wood_duration_threshold": {
         "name": "Dauer für niedrige Holzmodus-Warnung (Sekunden)"
       },
-      "high_smoke_temp_alert": {
-        "name": "Warnung vor hoher Rauchentwicklung"
-      },
-      "low_wood_temp_alert": {
-        "name": "Warnung bei niedriger Holztemperatur"
+      "force_fan_max_duration": {
+        "name": "Max. Dauer für erzwungenen Lüfterbetrieb"
       }
     },
     "button": {
@@ -348,6 +357,9 @@
       },
       "force_auger": {
         "name": "Schnecke erzwingen"
+      },
+      "reset_alarm": {
+        "name": "Alarm zurücksetzen"
       }
     }
   },

@@ -137,7 +137,10 @@ The system automatically learns from your stove's operation by tracking:
 
 ***Sensor Display***
 
-- ***Main Value:*** Date and time when pellets will be depleted (e.g., "2026-01-17 23:30")
+- ***Main Value:*** Date and time (e.g., "2026-01-17 23:30") either for when:
+   - Pellets will be depleted
+   - When auto shut down level is reached if that is activated
+   - When the temperature have droped to target temperature if the stove stops at a temperature higher than target temperature
 - ***Status Messages:***
    - "Insufficient data" - Still learning (need 10hrs+ per heat level, 5+ waiting periods)
    - "Empty" - No pellets remaining

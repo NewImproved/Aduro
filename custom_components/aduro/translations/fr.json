@@ -20,7 +20,9 @@
       "missing_pin": "PIN est requis",
       "invalid_ip": "Adresse IP invalide",
       "cannot_connect": "échec de connexion",
-      "unknown": "Erreur inconnue"
+      "unknown": "Erreur inconnue",
+      "sensor_not_found": "Capteur introuvable",
+      "not_weather_entity": "Aucune entité météo"
     },
     "abort": {
       "already_configured": "Ce poêle est déjà configuré"
@@ -39,7 +41,7 @@
         },
         "data_description": {
           "stove_ip": "Laisser vide pour la découverte automatique ou entrer une adresse IP fixe",
-          "external_temp_sensor": "Ajouter un capteur pour fournir de meilleures données d’apprentissage au capteur de consommation de pellets",
+          "external_temp_sensor": "Ajouter un capteur pour fournir de meilleures données d'apprentissage au capteur de consommation de pellets",
           "weather_forecast_sensor": "Ajouter un capteur pour augmenter la précision du capteur de consommation de pellets"
         },
         "menu_options": {
@@ -129,7 +131,7 @@
           "substate_door_open": "Porte ouverte",
           "substate_heating_up": "En chauffe",
           "substate_check_burn_cup": "Vérifiez le creuset de combustion",
-          "substate_dropshaft_hot": "Conduit d'alimentation chaud"          
+          "substate_dropshaft_hot": "Conduit d'alimentation chaud"
         }
       },
       "consumption_since_cleaning": {
@@ -162,7 +164,7 @@
         "name": "Température des fumée"
       },
       "shaft_temp": {
-        "name": "Température de la vis d’alimentation"
+        "name": "Température de la vis d'alimentation"
       },
       "power_kw": {
         "name": "Puissance de sortie"
@@ -228,19 +230,19 @@
         "name": "Version du logiciel"
       },
       "timer_startup_1": {
-        "name": "Minuterie d’allumage 1"
+        "name": "Minuterie d'allumage 1"
       },
       "timer_startup_2": {
-        "name": "Minuterie d’allumage 2"
+        "name": "Minuterie d'allumage 2"
       },
       "operating_time_stove": {
         "name": "Temps de fonctionnement total"
       },
       "operating_time_auger": {
-        "name": "Temps de fonctionnement de la vis d’alimentation"
+        "name": "Temps de fonctionnement de la vis d'alimentation"
       },
       "operating_time_ignition": {
-        "name": "Durée de fonctionnement de l’allumage"
+        "name": "Durée de fonctionnement de l'allumage"
       },
       "mode_transition": {
         "name": "Changement de mode"
@@ -249,7 +251,7 @@
         "name": "Changement en cours"
       },
       "display_format": {
-        "name": "Format d’affichage",
+        "name": "Format d'affichage",
         "state_attributes": {
           "heatlevel_format": {
             "name": "Niveau de chaleur (temp. pièce): {display_target} ({current_temperature})°C"
@@ -261,7 +263,7 @@
             "name": "Mode bois"
           }
         }
-      },        
+      },
       "display_target": {
         "name": "Puissance cible"
       },
@@ -275,7 +277,7 @@
         "name": "Alerte température du bois trop basse"
       },
       "carbon_monoxide": {
-      "name": "Niveau de Co"
+        "name": "Niveau de Co"
       },
       "carbon_monoxide_yellow": {
         "name": "Niveau d'alerte CO (jaune)"
@@ -303,6 +305,9 @@
       },
       "auto_resume_after_wood_mode": {
         "name": "Reprise automatique après le mode bois"
+      },
+      "force_fan": {
+        "name": "Forcer le ventilateur"
       }
     },
     "number": {
@@ -332,6 +337,9 @@
       },
       "low_wood_duration_threshold": {
         "name": "Seuil de durée de température basse du bois"
+      },
+      "force_fan_max_duration": {
+        "name": "Durée maximale du ventilateur forcé"
       }
     },
     "button": {
@@ -349,6 +357,9 @@
       },
       "force_auger": {
         "name": "Forcer la vis d'alimentation"
+      },
+      "reset_alarm": {
+        "name": "Réinitialiser l'alarme"
       }
     }
   },
@@ -400,8 +411,8 @@
       "description": "Reprend le fonctionnement aux pellets après le mode bois, en restaurant les paramètres précédents."
     },
     "force_auger": {
-      "name": "Forcer la vis d’alimentation",
-      "description": "Forcer le fonctionnement de la vis d’alimentation (pour test ou débloquer un bourrage)."
+      "name": "Forcer la vis d'alimentation",
+      "description": "Forcer le fonctionnement de la vis d'alimentation (pour test ou débloquer un bourrage)."
     },
     "set_custom": {
       "name": "Définir un paramètre personnalisé",
@@ -419,4 +430,3 @@
     }
   }
 }
-

@@ -662,6 +662,7 @@ This integration is built upon the excellent work of:
 
 - **[Clément Prévot](https://github.com/clementprevot)** - Creator of [pyduro](https://github.com/clementprevot/pyduro), the Python library for controlling Aduro hybrid stoves
 - **[SpaceTeddy](https://github.com/SpaceTeddy)** - Creator of [Home Assistant Aduro stove control scripts](https://github.com/SpaceTeddy/homeassistant_aduro_stove_control_python_scripts)
+- **[Claude.ai](https://claude.ai/)**
 
 ## License
 

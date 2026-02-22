@@ -625,7 +625,6 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 ## Development plans/wish list
 
 - Get confirmation/information about the remaining Aduro hybrid stoves.
-- Estimation of pellets consumption over time, depending on temperature settings, heat level settings, outside temperature and other relevant factors to estimate a time for when the stove have consumed all pellets.
 - External and wireless temperature sensor is available as an accessory. Could it be possible to use other temperature sensors and send the information to the stove via Home Assistant?
 
 ## Aduro Stove Card

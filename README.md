@@ -314,6 +314,7 @@ The integration will automatically:
 - **This Month's Consumption** - Current month (kg)
 - **This Year's Consumption** - Current year (kg)
 - **Total Consumption** - Lifetime consumption (kg)
+- **Pellet Depletion Prediction** - Calculated time when stove stops to heat the room.
 
 #### Carbon Monoxide
 - **Carbon Monoxide Level** - Current Carbon monoxide level (ppm)
@@ -631,7 +632,8 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 
 A custom and optional Lovelace card for controlling Aduro Hybrid Stoves in Home Assistant can be found here: [Aduro Stove Card](https://github.com/NewImproved/Aduro-Stove-Card)
 
-<img width="506" height="737" alt="image" src="https://github.com/user-attachments/assets/cded111a-f0ad-4f3e-81bf-48fa15ca4b49" />
+<img width="510" height="826" alt="image" src="https://github.com/user-attachments/assets/d8eeca8a-68c0-473a-8d4e-398b7413a5b3" />
+
 
 
 ### Features

@@ -77,6 +77,10 @@ force_auger:
   description: Force the pellet auger to run (for testing or clearing jams).
   fields: {}
 
+reset_alarm:
+  name: Reset Alarm
+  description: Resets active alarms on the Aduro stove.
+
 set_custom:
   name: Set Custom Parameter
   description: Set a custom stove parameter by path and value (advanced).

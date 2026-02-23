@@ -29,6 +29,7 @@ async def async_setup_entry(
         AduroStartStopSwitch(coordinator, entry),
         AduroAutoShutdownSwitch(coordinator, entry),
         AduroAutoResumeAfterWoodSwitch(coordinator, entry),
+        AduroForceFanSwitch(coordinator, entry),
     ]
 
     async_add_entities(switches)
@@ -321,4 +322,63 @@ class AduroAutoResumeAfterWoodSwitch(AduroSwitchBase):
         _LOGGER.info("Switch: Disabling auto-resume after wood mode")
         self.coordinator.set_auto_resume_after_wood(False)
         await self.coordinator.async_save_pellet_data()
+        await self.coordinator.async_request_refresh()
+
+
+class AduroForceFanSwitch(AduroSwitchBase):
+    """Switch to run the fan in manual mode."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the switch."""
+        super().__init__(coordinator, entry, "force_fan", "force_fan")
+        self._attr_icon = "mdi:fan"
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if force fan is active."""
+        return self.coordinator.data.get("force_fan_active", False)
+
+    @property
+    def icon(self) -> str:
+        """Return icon based on state."""
+        if self.is_on:
+            return "mdi:fan"
+        return "mdi:fan-off"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional state attributes."""
+        attrs = {
+            "max_duration_minutes": self.coordinator._force_fan_max_duration,
+            "smoke_temp_cutoff_c": 320,
+        }
+        
+        # Add running time if active
+        if self.is_on:
+            running_seconds = self.coordinator.data.get("calculated", {}).get("force_fan_running_seconds")
+            if running_seconds is not None:
+                attrs["running_seconds"] = running_seconds
+                attrs["running_minutes"] = round(running_seconds / 60, 1)
+        
+        # Add last stop reason if available
+        stop_reason = self.coordinator.data.get("force_fan_stop_reason")
+        if stop_reason:
+            attrs["last_stop_reason"] = stop_reason
+        
+        return attrs
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on force fan."""
+        _LOGGER.info("Switch: Turning on force fan")
+        success = await self.coordinator.async_start_force_fan()
+        
+        if success:
+            await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.error("Switch: Failed to turn on force fan")
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off force fan."""
+        _LOGGER.info("Switch: Turning off force fan")
+        await self.coordinator.async_stop_force_fan(reason="manual")
         await self.coordinator.async_request_refresh()

@@ -305,6 +305,9 @@
       },
       "auto_resume_after_wood_mode": {
         "name": "Auto Resume After Wood Mode"
+      },
+      "force_fan": {
+        "name": "Force Fan"
       }
     },
     "number": {
@@ -334,6 +337,9 @@
       },
       "low_wood_duration_threshold": {
         "name": "Low wood duration threshold"
+      },
+     "force_fan_max_duration": {
+        "name": "Force Fan Max Duration"
       }
     },
     "button": {
@@ -351,6 +357,9 @@
       },
       "force_auger": {
         "name": "Force Auger"
+      },
+      "reset_alarm": {
+        "name": "Reset Alarm"
       }
     }
   },

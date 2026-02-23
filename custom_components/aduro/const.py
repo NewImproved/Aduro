@@ -43,6 +43,11 @@ DEFAULT_HIGH_SMOKE_DURATION: Final = 30  # seconds
 DEFAULT_LOW_WOOD_TEMP: Final = 170  # °C
 DEFAULT_LOW_WOOD_DURATION: Final = 300  # seconds (5 minutes)
 
+# Force Fan Defaults
+FORCE_FAN_DURATION_MIN: Final = 1 # seconds
+FORCE_FAN_DURATION_MAX: Final = 900 # seconds (15 minutes)
+FORCE_FAN_DURATION_STEP: Final = 1 # seconds
+
 # Temperature Alert Limits
 HIGH_SMOKE_TEMP_MIN: Final = 300
 HIGH_SMOKE_TEMP_MAX: Final = 450

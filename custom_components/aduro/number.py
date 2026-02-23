@@ -12,12 +12,26 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import (
     DOMAIN,
     HEAT_LEVEL_MIN,
     HEAT_LEVEL_MAX,
     HEAT_LEVEL_STEP,
+    HEAT_LEVEL_DISPLAY,
+    HIGH_SMOKE_TEMP_MIN,
+    HIGH_SMOKE_TEMP_MAX,
+    HIGH_SMOKE_TEMP_STEP,
+    HIGH_SMOKE_DURATION_MIN,
+    HIGH_SMOKE_DURATION_MAX,
+    HIGH_SMOKE_DURATION_STEP,
+    LOW_WOOD_TEMP_MIN,
+    LOW_WOOD_TEMP_MAX,
+    LOW_WOOD_TEMP_STEP,
+    LOW_WOOD_DURATION_MIN,
+    LOW_WOOD_DURATION_MAX,
+    LOW_WOOD_DURATION_STEP,
     TEMP_MIN,
     TEMP_MAX,
     TEMP_STEP,
@@ -30,6 +44,9 @@ from .const import (
     SHUTDOWN_LEVEL_MIN,
     SHUTDOWN_LEVEL_MAX,
     SHUTDOWN_LEVEL_STEP,
+    FORCE_FAN_DURATION_MIN,
+    FORCE_FAN_DURATION_MAX,
+    FORCE_FAN_DURATION_STEP,
 )
 from .coordinator import AduroCoordinator
 
@@ -57,6 +74,7 @@ async def async_setup_entry(
         AduroHighSmokeDurationThresholdNumber(coordinator, entry),
         AduroLowWoodTempThresholdNumber(coordinator, entry),
         AduroLowWoodDurationThresholdNumber(coordinator, entry),
+        AduroForceFanMaxDurationNumber(coordinator, entry),
     ]
 
     async_add_entities(numbers)
@@ -218,7 +236,6 @@ class AduroHeatlevelNumber(AduroNumberBase):
             return {}
         
         heatlevel = self.coordinator.data["operating"].get("heatlevel", 1)
-        from .const import HEAT_LEVEL_DISPLAY
         
         attrs = {
             "display": HEAT_LEVEL_DISPLAY.get(heatlevel, str(heatlevel)),
@@ -328,6 +345,7 @@ class AduroPelletCapacityNumber(AduroNumberBase):
         """Initialize the number entity."""
         super().__init__(coordinator, entry, "pellet_capacity", "pellet_capacity")
         self._attr_icon = "mdi:grain"
+        self._attr_entity_category = EntityCategory.CONFIG
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = PELLET_CAPACITY_MIN
         self._attr_native_max_value = PELLET_CAPACITY_MAX
@@ -375,6 +393,7 @@ class AduroNotificationLevelNumber(AduroNumberBase):
         """Initialize the number entity."""
         super().__init__(coordinator, entry, "low_pellet_notification_level", "low_pellet_notification_level")
         self._attr_icon = "mdi:bell-alert"
+        self._attr_entity_category = EntityCategory.CONFIG
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = NOTIFICATION_LEVEL_MIN
         self._attr_native_max_value = NOTIFICATION_LEVEL_MAX
@@ -424,6 +443,7 @@ class AduroShutdownLevelNumber(AduroNumberBase):
         """Initialize the number entity."""
         super().__init__(coordinator, entry, "auto_shutdown_pellet_level", "auto_shutdown_pellet_level")
         self._attr_icon = "mdi:power-off"
+        self._attr_entity_category = EntityCategory.CONFIG
         self._attr_mode = NumberMode.BOX
         self._attr_native_min_value = SHUTDOWN_LEVEL_MIN
         self._attr_native_max_value = SHUTDOWN_LEVEL_MAX
@@ -473,8 +493,8 @@ class AduroHighSmokeTempThresholdNumber(AduroNumberBase):
         """Initialize the number entity."""
         super().__init__(coordinator, entry, "high_smoke_temp_threshold", "high_smoke_temp_threshold")
         self._attr_icon = "mdi:thermometer-alert"
+        self._attr_entity_category = EntityCategory.CONFIG
         self._attr_mode = NumberMode.BOX
-        from .const import HIGH_SMOKE_TEMP_MIN, HIGH_SMOKE_TEMP_MAX, HIGH_SMOKE_TEMP_STEP
         self._attr_native_min_value = HIGH_SMOKE_TEMP_MIN
         self._attr_native_max_value = HIGH_SMOKE_TEMP_MAX
         self._attr_native_step = HIGH_SMOKE_TEMP_STEP
@@ -522,8 +542,8 @@ class AduroHighSmokeDurationThresholdNumber(AduroNumberBase):
         """Initialize the number entity."""
         super().__init__(coordinator, entry, "high_smoke_duration_threshold", "high_smoke_duration_threshold")
         self._attr_icon = "mdi:timer-alert-outline"
+        self._attr_entity_category = EntityCategory.CONFIG
         self._attr_mode = NumberMode.BOX
-        from .const import HIGH_SMOKE_DURATION_MIN, HIGH_SMOKE_DURATION_MAX, HIGH_SMOKE_DURATION_STEP
         self._attr_native_min_value = HIGH_SMOKE_DURATION_MIN
         self._attr_native_max_value = HIGH_SMOKE_DURATION_MAX
         self._attr_native_step = HIGH_SMOKE_DURATION_STEP
@@ -574,8 +594,8 @@ class AduroLowWoodTempThresholdNumber(AduroNumberBase):
         """Initialize the number entity."""
         super().__init__(coordinator, entry, "low_wood_temp_threshold", "low_wood_temp_threshold")
         self._attr_icon = "mdi:thermometer-low"
+        self._attr_entity_category = EntityCategory.CONFIG
         self._attr_mode = NumberMode.BOX
-        from .const import LOW_WOOD_TEMP_MIN, LOW_WOOD_TEMP_MAX, LOW_WOOD_TEMP_STEP
         self._attr_native_min_value = LOW_WOOD_TEMP_MIN
         self._attr_native_max_value = LOW_WOOD_TEMP_MAX
         self._attr_native_step = LOW_WOOD_TEMP_STEP
@@ -627,8 +647,8 @@ class AduroLowWoodDurationThresholdNumber(AduroNumberBase):
         """Initialize the number entity."""
         super().__init__(coordinator, entry, "low_wood_duration_threshold", "low_wood_duration_threshold")
         self._attr_icon = "mdi:timer-outline"
+        self._attr_entity_category = EntityCategory.CONFIG
         self._attr_mode = NumberMode.BOX
-        from .const import LOW_WOOD_DURATION_MIN, LOW_WOOD_DURATION_MAX, LOW_WOOD_DURATION_STEP
         self._attr_native_min_value = LOW_WOOD_DURATION_MIN
         self._attr_native_max_value = LOW_WOOD_DURATION_MAX
         self._attr_native_step = LOW_WOOD_DURATION_STEP
@@ -671,4 +691,58 @@ class AduroLowWoodDurationThresholdNumber(AduroNumberBase):
 
     async def _actually_set_value(self, value: float) -> None:
         """Not used - threshold changes are immediate."""
+        pass
+
+
+class AduroForceFanMaxDurationNumber(AduroNumberBase):
+    """Number entity for force fan maximum duration."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the number entity."""
+        super().__init__(coordinator, entry, "force_fan_max_duration", "force_fan_max_duration")
+        self._attr_icon = "mdi:timer-outline"
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_mode = NumberMode.BOX
+        self._attr_native_min_value = FORCE_FAN_DURATION_MIN
+        self._attr_native_max_value = FORCE_FAN_DURATION_MAX
+        self._attr_native_step = FORCE_FAN_DURATION_STEP
+        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current max duration."""
+        return float(self.coordinator._force_fan_max_duration)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {
+            "duration_seconds": self.coordinator._force_fan_max_duration,
+        }
+        
+        # Show force fan status if active
+        force_fan_active = self.coordinator.data.get("force_fan_active", False)
+        attrs["force_fan_active"] = force_fan_active
+        
+        if force_fan_active:
+            running_seconds = self.coordinator.data.get("calculated", {}).get("force_fan_running_seconds")
+            if running_seconds is not None:
+                attrs["time_elapsed_minutes"] = round(running_seconds / 60, 1)
+                attrs["time_remaining_minutes"] = round(
+                    max(0, (self.coordinator._force_fan_max_duration) - running_seconds) / 60, 
+                    1
+                )
+        
+        return attrs
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the max duration - no debouncing needed for config values."""
+        duration = int(value)
+        _LOGGER.info("Number: Setting force fan max duration to %s minutes", duration)
+        
+        self.coordinator.set_force_fan_max_duration(duration)
+        await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - duration changes are immediate."""
         pass

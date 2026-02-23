@@ -20,7 +20,9 @@
       "missing_pin": "PIN er påkrævet",
       "invalid_ip": "Ugyldig IP adresse",
       "cannot_connect": "Kunne ikke forbinde",
-      "unknown": "Uventet fejl"
+      "unknown": "Uventet fejl",
+      "sensor_not_found": "Sensor ikke fundet",
+      "not_weather_entity": "Ingen vejrenhed"
     },
     "abort": {
       "already_configured": "Brændeovnen er allerede sat op"
@@ -94,7 +96,7 @@
   },
   "entity": {
     "sensor": {
-      "state_disp": {
+      "state": {
         "name": "Status",
         "state": {
           "state_operating": "Drift {heatlevel}",
@@ -128,7 +130,8 @@
           "substate_no_fuel": "Ingen brænde/piller",
           "substate_door_open": "Dør åben",
           "substate_heating_up": "Varmer op",
-          "substate_check_burn_cup": "Kontroller brændekammeret"
+          "substate_check_burn_cup": "Kontroller brændekammeret",
+          "substate_dropshaft_hot": "Faldskaft for varm"
         }
       },
       "consumption_since_cleaning": {
@@ -268,13 +271,13 @@
         "name": "Ekstern ændring opdaget"
       },
       "high_smoke_temp_alert": {
-        "name": "Alarm for høj temperatur"
+        "name": "Alarm for høj røgtemperatur"
       },
       "low_wood_temp_alert": {
-        "name": "Alarm for lav temperatur"
+        "name": "Alarm for lav brændetemperatur"
       },
       "carbon_monoxide": {
-      "name": "Kulmonoxidniveau"
+        "name": "Kulmonoxidniveau"
       },
       "carbon_monoxide_yellow": {
         "name": "Kulmonoxidniveau gul"
@@ -302,6 +305,9 @@
       },
       "auto_resume_after_wood_mode": {
         "name": "Fortsæt automatisk efter brændemode"
+      },
+      "force_fan": {
+        "name": "Tving blæser"
       }
     },
     "number": {
@@ -321,16 +327,19 @@
         "name": "Pilleniveau for autosluk"
       },
       "high_smoke_temp_threshold": {
-        "name": "Grænse for høj temperatur"
+        "name": "Grænse for høj røgtemperatur"
       },
       "high_smoke_duration_threshold": {
-        "name": "Periode for høj temperatur"
+        "name": "Periode for høj røgtemperatur"
       },
       "low_wood_temp_threshold": {
         "name": "Grænse for lav brændetemperatur"
       },
       "low_wood_duration_threshold": {
         "name": "Periode for lav brændetemperatur"
+      },
+      "force_fan_max_duration": {
+        "name": "Maks. varighed for tvungen blæser"
       }
     },
     "button": {
@@ -348,6 +357,9 @@
       },
       "force_auger": {
         "name": "Kør sneglen"
+      },
+      "reset_alarm": {
+        "name": "Nulstil alarm"
       }
     }
   },

@@ -9,6 +9,7 @@ from typing import Any
 import math
 
 from pyduro.actions import discover, get, set, raw, STATUS_PARAMS
+from homeassistant.helpers.event import async_track_time_interval
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -163,7 +164,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "shutdown": {
                     "count": 0,
                     "total_delta": 0.0,
-                    "avg_delta": 1.1,  # Default: target + 1.1°C
+                    "avg_delta": 1,  # Default: target + 1°C - Changed logic. Use 1 degree always.
                 },
                 "restart": {
                     "count": 0,
@@ -189,6 +190,12 @@ class AduroCoordinator(DataUpdateCoordinator):
         # External temperature sensor configuration
         self._external_temp_sensor = entry.data.get(CONF_EXTERNAL_TEMP_SENSOR)
         self._external_temp_value = None
+
+        # Force fan tracking
+        self._force_fan_active = False
+        self._force_fan_unsub = None
+        self._force_fan_started_at: datetime | None = None
+        self._force_fan_max_duration = 60  # seconds, configurable
 
         # Weather forecast sensor configuration
         self._weather_forecast_sensor = entry.data.get(CONF_WEATHER_FORECAST_SENSOR)
@@ -337,6 +344,10 @@ class AduroCoordinator(DataUpdateCoordinator):
 
             # Update learning consumption tracker
             self._update_learning_consumption_tracker(data)
+
+            # Preserve force fan state across poll cycles
+            data["force_fan_active"] = self._force_fan_active
+            data["force_fan_stop_reason"] = self.data.get("force_fan_stop_reason") if self.data else None
 
             # Add calculated/derived data
             _LOGGER.debug("Adding calculated data")
@@ -1018,7 +1029,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         else:  # Wood mode
             display_target = 0
             display_target_type = "wood"
-        
+    
         data["calculated"] = {
             "heatlevel_match": heatlevel_match,
             "temperature_match": temp_match,
@@ -1030,6 +1041,14 @@ class AduroCoordinator(DataUpdateCoordinator):
             "display_target_type": display_target_type,
             "current_temperature": current_temperature,
         }
+
+        # Force fan status
+        if self._force_fan_active and self._force_fan_started_at:
+            try:
+                elapsed = (datetime.now() - self._force_fan_started_at).total_seconds()
+                data["calculated"]["force_fan_running_seconds"] = int(elapsed)
+            except (TypeError, AttributeError):
+                pass
 
     async def _async_discover_stove(self) -> None:
         """Discover the stove on the network with retry logic and graceful fallback."""
@@ -1603,6 +1622,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._high_smoke_duration_threshold = data.get("high_smoke_duration_threshold", 30)
                 self._low_wood_temp_threshold = data.get("low_wood_temp_threshold", 175.0)
                 self._low_wood_duration_threshold = data.get("low_wood_duration_threshold", 300)
+                self._force_fan_max_duration = data.get("force_fan_max_duration", 60)
 
                 # Load learning data (convert string keys back to tuples)
                 _LOGGER.info("=== Starting to load learning data ===")
@@ -1680,7 +1700,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         "shutdown": {
                             "count": 0,
                             "total_delta": 0.0,
-                            "avg_delta": 1.1,
+                            "avg_delta": 1,
                         },
                         "restart": {
                             "count": 0,
@@ -2260,6 +2280,8 @@ class AduroCoordinator(DataUpdateCoordinator):
                         target_temp=session["target_temp"],
                     )
                     
+                    # THIS IS JUST LOGGING RESTART DELTA
+                    # CALCULATION IS USING FIXED VALUES. 
                     # Only record restart delta if this was AUTOMATIC (no user intervention)
                     # Check:
                     # 1. Still in temperature mode (user didn't switch to heat level)
@@ -2313,7 +2335,9 @@ class AduroCoordinator(DataUpdateCoordinator):
                     "target_temp": current_target_temp,
                     "operation_mode": current_operation_mode,  # Track mode at start
                 }
-                
+
+                # THIS IS JUST LOGGING SHUTDOWN DELTA
+                # CALCULATION IS USING FIXED VALUES.                
                 # Record shutdown delta if we just stopped (only if not interrupted)
                 if self._current_heating_session is not None:
                     shutdown_delta = current_room_temp - current_target_temp
@@ -2693,8 +2717,11 @@ class AduroCoordinator(DataUpdateCoordinator):
         outdoor_temp = self._get_external_temperature()
         
         # Get learned deltas
-        shutdown_delta = self._learning_data["shutdown_restart_deltas"]["shutdown"]["avg_delta"]
-        restart_delta = self._learning_data["shutdown_restart_deltas"]["restart"]["avg_delta"]
+        #Use fixed values
+        #shutdown_delta = self._learning_data["shutdown_restart_deltas"]["shutdown"]["avg_delta"]
+        #restart_delta = self._learning_data["shutdown_restart_deltas"]["restart"]["avg_delta"]
+        shutdown_delta = 1
+        restart_delta = 0.5
         
         # Get learning status
         learning_status = self._get_learning_status()
@@ -3094,7 +3121,87 @@ class AduroCoordinator(DataUpdateCoordinator):
                 # Default: continue burning
                 continue
         
-        # Build result
+        # === SIMULATION ENDED - ADD RESIDUAL HEAT DISSIPATION ===
+        # The stove is out of pellets, but the room is still warm
+        # Calculate time for room to cool to target temperature
+        
+        if sim_room_temp > target_temp:
+            _LOGGER.debug(
+                "Pellets empty at %.1f°C (target: %.1f°C) - calculating residual heat dissipation",
+                sim_room_temp, target_temp
+            )
+            # Room is warmer than target - will continue providing useful heat
+            # Calculate cooling time to target temperature
+            
+            # Get outdoor temp at current simulation time
+            future_time = datetime.now() + timedelta(seconds=total_time_seconds)
+            
+            if forecast_available:
+                forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
+                if forecast_temp is not None:
+                    outdoor_temp = forecast_temp
+                else:
+                    outdoor_temp = self._get_external_temperature()
+                    if outdoor_temp is None:
+                        outdoor_temp = 0
+            else:
+                outdoor_temp = self._get_external_temperature()
+                if outdoor_temp is None:
+                    outdoor_temp = 0
+            
+            # Calculate cooling in hourly steps until target reached
+            while sim_room_temp > target_temp:
+                # Get cooling rate
+                cooling_rate = self._get_cooling_rate(
+                    start_room_temp=sim_room_temp,
+                    outdoor_temp=outdoor_temp,
+                )
+                
+                if cooling_rate <= 0:
+                    # No cooling happening (shouldn't happen, but safety check)
+                    break
+                
+                # Calculate time to reach target temp
+                temp_to_lose = sim_room_temp - target_temp
+                time_to_target = (temp_to_lose / cooling_rate) * 3600
+                
+                # Limit step to 1 hour for forecast updates
+                max_step_size = 3600
+                if time_to_target > max_step_size:
+                    actual_step = max_step_size
+                    temp_decrease = cooling_rate * (actual_step / 3600)
+                else:
+                    actual_step = time_to_target
+                    temp_decrease = temp_to_lose
+                
+                # Update state
+                sim_room_temp -= temp_decrease
+                total_time_seconds += actual_step
+                
+                # Check if reached target
+                if sim_room_temp <= target_temp:
+                    sim_room_temp = target_temp
+                    break
+                
+                # Update outdoor temp for next step
+                future_time = datetime.now() + timedelta(seconds=total_time_seconds)
+                if forecast_available:
+                    forecast_temp = self._get_forecast_temp_at_time(forecast_data, future_time)
+                    if forecast_temp is not None:
+                        outdoor_temp = forecast_temp
+            
+            _LOGGER.debug(
+                "Added residual heat dissipation: %.1f minutes to cool to target",
+                (total_time_seconds - (total_time_seconds - actual_step)) / 60
+            )
+        
+        else:
+            _LOGGER.debug(
+                "Pellets empty at %.1f°C (target: %.1f°C) - no residual heat, ending immediately",
+                sim_room_temp, target_temp
+            )
+
+        # Format results
         depletion_datetime = datetime.now() + timedelta(seconds=total_time_seconds)
         
         confidence = self._calculate_confidence_level(
@@ -3103,7 +3210,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             cycles_predicted=cycles_count,
         )
         
-        result = {
+        return {
             "time_remaining_seconds": int(total_time_seconds),
             "time_remaining_formatted": self._format_time_remaining(int(total_time_seconds)),
             "depletion_datetime": depletion_datetime,
@@ -3118,6 +3225,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             "prediction_mode": "actual" if is_running else "hypothetical",
             "forecast_used": forecast_available,
             "forecast_horizon_hours": round(forecast_horizon_hours, 1) if forecast_available else 0,
+            "residual_heat_included": sim_room_temp > target_temp, 
         }
         
         # Check if prediction changed significantly and log details
@@ -3257,6 +3365,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "high_smoke_duration_threshold": self._high_smoke_duration_threshold,
                 "low_wood_temp_threshold": self._low_wood_temp_threshold,
                 "low_wood_duration_threshold": self._low_wood_duration_threshold,
+                "force_fan_max_duration": self._force_fan_max_duration,
                 # Save learning data (convert tuple keys to strings and datetime to isoformat for JSON compatibility)
                 "learning_data": {
                     "heating_observations": {
@@ -3646,6 +3755,145 @@ class AduroCoordinator(DataUpdateCoordinator):
         else:
             _LOGGER.error("Failed to force auger")
         return result
+
+    async def async_reset_alarm(self) -> bool:
+        """Reset alarm."""
+        _LOGGER.info("Resetting alarm")
+        result = await self.async_set_custom(path="misc.reset_alarm", value=1)
+        if result:
+            _LOGGER.info("Alarm reset successfully")
+        else:
+            _LOGGER.error("Failed to reset alarm")
+        return result
+
+    async def async_start_force_fan(self) -> bool:
+        """Enter manual mode and start the fan."""
+        _LOGGER.info("Starting force fan")
+        
+        # Enter manual mode
+        result = await self._async_send_command("manual.manual_mode", 1)
+        if not result:
+            _LOGGER.error("Failed to enter manual mode")
+            return False
+        
+        await asyncio.sleep(1)
+        
+        # Start fan (output_std=2)
+        result = await self._async_send_command("manual.output_std", 2)
+        if not result:
+            _LOGGER.error("Failed to start fan")
+            await self._async_send_command("manual.manual_mode", 0)  # Exit manual mode
+            return False
+        
+        # Track state
+        self._force_fan_active = True
+        self._force_fan_started_at = datetime.now()
+        
+        # Start keep-alive interval (every 20 seconds)
+        self._force_fan_unsub = async_track_time_interval(
+            self.hass,
+            self._async_force_fan_tick,
+            timedelta(seconds=20),
+        )
+        
+        _LOGGER.info("Force fan started successfully")
+        
+        # Update coordinator data for UI sync
+        if self.data:
+            self.data["force_fan_active"] = True
+            self.data["force_fan_stop_reason"] = None
+            self.async_update_listeners()
+        
+        return True
+
+    async def async_stop_force_fan(self, reason: str = "manual") -> bool:
+        """Exit manual mode and stop the fan."""
+        if not self._force_fan_active:
+            _LOGGER.debug("Force fan already stopped")
+            return True
+        
+        _LOGGER.info("Stopping force fan (reason: %s)", reason)
+        
+        # Stop keep-alive
+        if self._force_fan_unsub:
+            self._force_fan_unsub()
+            self._force_fan_unsub = None
+        
+        # Exit manual mode
+        result = await self._async_send_command("manual.manual_mode", 0)
+        
+        # Update state regardless of command result
+        self._force_fan_active = False
+        self._force_fan_started_at = None
+        
+        # Update coordinator data for UI sync
+        if self.data:
+            self.data["force_fan_active"] = False
+            self.data["force_fan_stop_reason"] = reason
+            self.async_update_listeners()
+        
+        if result:
+            _LOGGER.info("Force fan stopped successfully")
+        else:
+            _LOGGER.error("Failed to exit manual mode (state cleared anyway)")
+        
+        return result
+
+    async def _async_force_fan_tick(self, now=None) -> None:
+        """Keep-alive tick called every 20 seconds. Checks limits and sends keep-alive."""
+        if not self._force_fan_active:
+            # Safety check - shouldn't happen
+            if self._force_fan_unsub:
+                self._force_fan_unsub()
+                self._force_fan_unsub = None
+            return
+        
+        # Get current conditions
+        smoke_temp = 0
+        if self.data and "operating" in self.data:
+            smoke_temp = self.data["operating"].get("smoke_temp", 0)
+        
+        # Temperature cutoff check (320°C)
+        if smoke_temp and smoke_temp > 320:
+            _LOGGER.warning(
+                "Force fan stopped: smoke temp %.1f°C exceeds cutoff (320°C)",
+                smoke_temp
+            )
+            await self.async_stop_force_fan(reason="overheat")
+            return
+        
+        # Timeout cutoff check
+        if self._force_fan_started_at:
+            try:
+                elapsed = (datetime.now() - self._force_fan_started_at).total_seconds()
+                max_seconds = self._force_fan_max_duration
+                
+                if elapsed > max_seconds:
+                    _LOGGER.info(
+                        "Force fan stopped: max duration %d min reached",
+                        self._force_fan_max_duration
+                    )
+                    await self.async_stop_force_fan(reason="timeout")
+                    return
+            except (TypeError, AttributeError) as err:
+                _LOGGER.debug("Error checking force fan timeout: %s", err)
+        
+        # Send keep-alive
+        try:
+            await self._async_send_command("manual.keep_alive", 1)
+            _LOGGER.debug("Force fan keep-alive sent")
+        except Exception as err:
+            _LOGGER.error("Failed to send keep-alive, stopping force fan: %s", err)
+            await self.async_stop_force_fan(reason="error")
+
+    def set_force_fan_max_duration(self, duration: int) -> None:
+        """Set force fan maximum duration in seconds."""
+        self._force_fan_max_duration = duration
+        _LOGGER.info(
+            "Force fan max duration set to: %d seconds",
+            duration
+        )
+        asyncio.create_task(self.async_save_pellet_data())
 
     async def async_set_custom(self, path: str, value: Any) -> bool:
         """Set a custom parameter."""

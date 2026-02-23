@@ -77,6 +77,21 @@ async def _load_options(coordinator: AduroCoordinator, entry: ConfigEntry) -> No
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
+    
+    # Stop force fan if active and exit manual mode
+    if coordinator._force_fan_unsub:
+        coordinator._force_fan_unsub()
+        coordinator._force_fan_unsub = None
+        _LOGGER.debug("Force fan keep-alive stopped on unload")
+    
+    if coordinator._force_fan_active:
+        try:
+            await coordinator._async_send_command("manual.manual_mode", 0)
+            _LOGGER.info("Exited manual mode on unload")
+        except Exception as err:
+            _LOGGER.warning("Failed to exit manual mode on unload: %s", err)
+    
+    # Save pellet data (including force fan settings)
     await coordinator.async_save_pellet_data()
     
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
@@ -214,6 +229,18 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
                 else:
                     _LOGGER.error("Failed to force auger")
 
+    async def handle_reset_alarm(call):
+        """Handle alarm reset."""
+        _LOGGER.debug("Service called: reset_alarm")
+        
+        for entry_id, coord in hass.data[DOMAIN].items():
+            if isinstance(coord, AduroCoordinator):
+                success = await coord.async_reset_alarm()
+                if success:
+                    _LOGGER.info("Alarm reset successfully")
+                else:
+                    _LOGGER.error("Failed to reset alarm")
+
     async def handle_set_custom(call):
         """Handle set custom parameter service call."""
         path = call.data.get("path")
@@ -303,6 +330,12 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
 
     hass.services.async_register(
         DOMAIN,
+        "reset_alarm",
+        handle_reset_alarm,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
         "set_custom",
         handle_set_custom,
         schema=vol.Schema({
@@ -341,6 +374,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
         SERVICE_TOGGLE_MODE,
         SERVICE_RESUME_AFTER_WOOD,
         "force_auger",
+        "reset_alarm"
         "set_custom",
     ]
 

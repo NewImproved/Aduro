@@ -1,8 +1,11 @@
-[![GitHub release](https://img.shields.io/github/release/NewImproved/Aduro.svg)](https://github.com/NewImproved/Aduro/releases)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=W6WPMAQ3YKK6G)
+[![GitHub release](https://img.shields.io/github/release/NewImproved/Aduro.svg)](https://github.com/NewImproved/Aduro/releases)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NewImproved/Aduro/total)
+![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/NewImproved/Aduro/latest/total)
+
 
 # Aduro Hybrid Stove Integration for Home Assistant
-A comprehensive Home Assistant custom integration for Aduro H1, H2, H5 [H3, H4 and H6 unconfirmed] hybrid pellet stoves.
+A comprehensive Home Assistant custom integration for Aduro H1, H2, H3, H5 [H4 and H6 unconfirmed] hybrid pellet stoves.
 
 
 ## Features
@@ -74,8 +77,8 @@ The system automatically learns from your stove's operation by tracking:
 ***3. Cooling/Waiting Periods (Temperature Mode Only)***
 
 - Room cooling rates during waiting
-- Shutdown threshold (how far above target before stove stops)
-- Restart threshold (how far below target before stove restarts)
+- Shutdown threshold (how far above target before stove stops) - saved but currently not used for calculation.
+- Restart threshold (how far below target before stove restarts) - saved but currently not used for calculation.
 
 
 
@@ -107,6 +110,7 @@ The system automatically learns from your stove's operation by tracking:
 - Predicts multiple cycles until pellets run out
 - Accounts for stove's automatic level adjustments every 10+ minutes
 - Updates the calculation with the forecasted temperature for each hour into the simulation
+- If the simulation ends where the room temperature is above target temperature, the simulation calculates a cooling period for the room temperature to cool down to the target temperature. This is to avoid big jumps in depletion times, where the calculation switches between adding another waiting period or burning through all pellets before reaching the waiting period.
 
 ### Prediction Accuracy
 
@@ -133,7 +137,10 @@ The system automatically learns from your stove's operation by tracking:
 
 ***Sensor Display***
 
-- ***Main Value:*** Date and time when pellets will be depleted (e.g., "2026-01-17 23:30")
+- ***Main Value:*** Date and time (e.g., "2026-01-17 23:30") either for when:
+   - Pellets will be depleted
+   - When auto shut down level is reached if that is activated
+   - When the temperature have droped to target temperature if the stove stops at a temperature higher than target temperature
 - ***Status Messages:***
    - "Insufficient data" - Still learning (need 10hrs+ per heat level, 5+ waiting periods)
    - "Empty" - No pellets remaining
@@ -188,9 +195,9 @@ Before showing predictions, the system needs:
 - Configurations, user settings and some sensors are saved on file to survive restarts and upgrades.
 
 ## Supported Models
-Only Aduro H1, H2 & H5 have been confirmed to work with the integration.
+Only Aduro H1, H2, H3 & H5 have been confirmed to work with the integration.
 
-Asumptions have been made for Aduro H3, H4 and H6. They are not yet confirmed.
+Asumptions have been made for Aduro H4 and H6. They are not yet confirmed.
 If you can confirm that the integration work for a stove, please let me know via [GitHub Issues](https://github.com/NewImproved/Aduro/issues).
 
 
@@ -307,6 +314,7 @@ The integration will automatically:
 - **This Month's Consumption** - Current month (kg)
 - **This Year's Consumption** - Current year (kg)
 - **Total Consumption** - Lifetime consumption (kg)
+- **Pellet Depletion Prediction** - Calculated time when stove stops to heat the room.
 
 #### Carbon Monoxide
 - **Carbon Monoxide Level** - Current Carbon monoxide level (ppm)
@@ -338,6 +346,7 @@ The integration will automatically:
 - **Power** - Start/Stop the stove
 - **Auto Shutdown at Low Pellets** - Enable automatic shutdown at a certain pellets level and time
 - **Auto Resume After Wood Mode** - Enable automatic resume when in heat level mode. Activates when the smoke temperature drops below 120°C.
+- **Forced fan** - Runs fan until either smoke temp exceeds 320°C or the set time is exceeded.
 
 ### Numbers (9)
 
@@ -356,6 +365,9 @@ The integration will automatically:
 - **Low Wood Temp Alert Threshold** - Alert threshold (20-200°C)
 - **Low Wood Temp Alert Duration threshold** - Alert duration threshold (10-1800 seconds)
 
+#### Forced Fan Configuration
+- **Forced fan duration** - Fan duration threshold (1-900 seconds)
+- 
 ### Buttons (5)
 
 - **Refill Pellets** - Mark pellets as refilled
@@ -363,6 +375,7 @@ The integration will automatically:
 - **Toggle Mode** - Switch between Heat Level/Temperature modes
 - **Resume After Wood Mode** - Manual resume from wood mode
 - **Force Auger** - Manually run auger (advanced)
+- **Alert Reset** - Resets Alerts
 
 ## Services
 
@@ -612,14 +625,14 @@ See [ADDING_STATES.md](ADDING_STATES.md) for details.
 ## Development plans/wish list
 
 - Get confirmation/information about the remaining Aduro hybrid stoves.
-- Estimation of pellets consumption over time, depending on temperature settings, heat level settings, outside temperature and other relevant factors to estimate a time for when the stove have consumed all pellets.
 - External and wireless temperature sensor is available as an accessory. Could it be possible to use other temperature sensors and send the information to the stove via Home Assistant?
 
 ## Aduro Stove Card
 
 A custom and optional Lovelace card for controlling Aduro Hybrid Stoves in Home Assistant can be found here: [Aduro Stove Card](https://github.com/NewImproved/Aduro-Stove-Card)
 
-<img width="506" height="737" alt="image" src="https://github.com/user-attachments/assets/cded111a-f0ad-4f3e-81bf-48fa15ca4b49" />
+<img width="510" height="826" alt="image" src="https://github.com/user-attachments/assets/d8eeca8a-68c0-473a-8d4e-398b7413a5b3" />
+
 
 
 ### Features

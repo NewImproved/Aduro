@@ -769,7 +769,7 @@ class AduroPelletRefillCounterSensor(AduroSensorBase):
         self._attr_device_class = SensorDeviceClass.WEIGHT
         self._attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-        self._attr_icon = "mdi:grain"
+        self._attr_icon = "mdi:broom"
 
     @property
     def native_value(self) -> float | None:

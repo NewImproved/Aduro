@@ -107,14 +107,11 @@ class AduroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> AduroOptionsFlowHandler:
         """Get the options flow for this handler."""
-        return AduroOptionsFlowHandler(config_entry)
+        return AduroOptionsFlowHandler()
 
 
 class AduroOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for Aduro integration."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -204,15 +201,10 @@ class AduroOptionsFlowHandler(config_entries.OptionsFlow):
                         self.config_entry,
                         data=new_data
                     )
-                    
-                    # Update coordinator with new external temp sensor
-                    coordinator = self.hass.data[DOMAIN][self.config_entry.entry_id]
-                    coordinator._external_temp_sensor = new_data.get(CONF_EXTERNAL_TEMP_SENSOR)
-                    coordinator._weather_forecast_sensor = new_data.get(CONF_WEATHER_FORECAST_SENSOR)
-                    
-                    # Save the configuration
-                    await coordinator.async_save_pellet_data()
-                    
+                                      
+                    # Reload the integration so async_setup_entry runs again
+                    await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+
                     return self.async_create_entry(title="", data={})
             except Exception as err:
                 _LOGGER.exception("Unexpected error in options flow: %s", err)

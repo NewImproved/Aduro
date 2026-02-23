@@ -107,15 +107,11 @@ class AduroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> AduroOptionsFlowHandler:
         """Get the options flow for this handler."""
-        return AduroOptionsFlowHandler(config_entry)
+        return AduroOptionsFlowHandler()
 
 
 class AduroOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for Aduro integration."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
-        """Initialize options flow."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

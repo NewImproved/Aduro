@@ -369,7 +369,7 @@ The integration will automatically:
 
 #### Forced Fan Configuration
 - **Forced fan duration** - Fan duration threshold (1-900 seconds)
-- 
+  
 ### Buttons (5)
 
 - **Refill Pellets** - Mark pellets as refilled

@@ -237,11 +237,13 @@ If you can confirm that the integration work for a stove, please let me know via
 1. Go to **Settings** → **Devices & Services**
 2. Click **"+ ADD INTEGRATION"**
 3. Search for **"Aduro Hybrid Stove"**
-4. Enter only 3 required details:
+4. Enter the following details:
    - **Serial Number**: Your stove's serial number
    - **PIN Code**: Your stove's PIN code
    - **Stove Model**: Select your model (H1-H6)
    - **IP-address**: Set fixed IP-address (optional)
+   - **External temperature sensor**: Set an outside temperature sensor (Recommended)
+   - **Weather forecast sensor**: Set an weather forecast sensor with hourly forecasts (Recommended)
 
 The integration will automatically:
 - Discover your stove on the network

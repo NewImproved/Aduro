@@ -1120,11 +1120,16 @@ class AduroCoordinator(DataUpdateCoordinator):
                     
                     if attempt < max_retries - 1:
                         _LOGGER.debug("Waiting %d seconds before retry...", retry_delay)
-                        await asyncio.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff (1s, 2s, 4s)
+                        try:
+                            await asyncio.sleep(retry_delay)
+                        except asyncio.CancelledError:
+                            _LOGGER.warning("Sleep cancelled, falling back to cloud backup")
+                            self.stove_ip = CLOUD_BACKUP_ADDRESS
+                            self.last_discovery = datetime.now()
+                            return
+                        retry_delay *= 2
                         continue
                     else:
-                        # All retries exhausted
                         _LOGGER.warning(
                             "All %d discovery attempts failed, using cloud backup: %s",
                             max_retries,
@@ -1138,14 +1143,12 @@ class AduroCoordinator(DataUpdateCoordinator):
                 data = response.parse_payload()
                 discovered_ip = data.get("IP", CLOUD_BACKUP_ADDRESS)
                 
-                # Store previous versions to detect changes
                 old_version = self.firmware_version
                 old_build = self.firmware_build
                 
                 self.firmware_version = data.get("Ver")
                 self.firmware_build = data.get("Build")
                 
-                # Validate discovered IP
                 if not discovered_ip or "0.0.0.0" in discovered_ip:
                     _LOGGER.warning("Invalid discovered IP (%s), using cloud backup", discovered_ip)
                     self.stove_ip = CLOUD_BACKUP_ADDRESS
@@ -1162,7 +1165,6 @@ class AduroCoordinator(DataUpdateCoordinator):
                     self.firmware_build,
                 )
                 
-                # Check if firmware changed
                 version_changed = (old_version != self.firmware_version or 
                                 old_build != self.firmware_build)
                 
@@ -1177,22 +1179,39 @@ class AduroCoordinator(DataUpdateCoordinator):
                     await self._update_device_registry()
                 
                 return  # Success!
+
+            except asyncio.CancelledError:
+                # HA is cancelling setup - fall back to cloud immediately, don't retry
+                _LOGGER.warning("Discovery cancelled by HA, falling back to cloud backup")
+                self.stove_ip = CLOUD_BACKUP_ADDRESS
+                self.last_discovery = datetime.now()
+                return  # Do NOT re-raise, just use cloud
                 
             except Exception as err:
                 _LOGGER.warning("Discovery attempt %d/%d failed with exception: %s", 
                             attempt + 1, max_retries, err)
                 
-                if attempt < max_retries - 1:
-                    _LOGGER.debug("Waiting %d seconds before retry...", retry_delay)
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
+                # If port is still in use from a previous cancelled attempt, wait longer
+                if "Address in use" in str(err):
+                    _LOGGER.debug("Port still in use, waiting 5 seconds for OS to release it...")
+                    wait_time = 5
+                elif attempt < max_retries - 1:
+                    wait_time = retry_delay
+                    retry_delay *= 2
                 else:
-                    # All retries exhausted
                     _LOGGER.warning(
                         "All %d discovery attempts failed, using cloud backup: %s",
                         max_retries,
                         CLOUD_BACKUP_ADDRESS
                     )
+                    self.stove_ip = CLOUD_BACKUP_ADDRESS
+                    self.last_discovery = datetime.now()
+                    return
+
+                try:
+                    await asyncio.sleep(wait_time)
+                except asyncio.CancelledError:
+                    _LOGGER.warning("Sleep cancelled, falling back to cloud backup")
                     self.stove_ip = CLOUD_BACKUP_ADDRESS
                     self.last_discovery = datetime.now()
                     return

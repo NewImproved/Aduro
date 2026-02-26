@@ -588,7 +588,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             # CRITICAL FIX: Clear ALL pending changes and targets when externally stopped
             if self._change_in_progress or self._toggle_heat_target:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Clearing pending changes due to external stop command - "
                     "was targeting: HL=%s, Temp=%s, Mode=%s",
                     self._target_heatlevel,
@@ -751,14 +751,14 @@ class AduroCoordinator(DataUpdateCoordinator):
             try:
                 elapsed = (datetime.now() - self._mode_change_started).total_seconds()
             except TypeError:
-                _LOGGER.warning("Invalid _mode_change_started timestamp, resetting")
+                _LOGGER.debug("Invalid _mode_change_started timestamp, resetting")
                 self._mode_change_started = datetime.now()
                 elapsed = 0
             
             # Try resending after TIMEOUT_COMMAND_RESPONSE
             if elapsed > TIMEOUT_COMMAND_RESPONSE and self._resend_attempt < self._max_resend_attempts:
                 self._resend_attempt += 1
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Mode change timeout, resending command (attempt %d/%d)",
                     self._resend_attempt,
                     self._max_resend_attempts
@@ -942,7 +942,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Check for low pellet notification
         if percentage <= self._notification_level and not self._low_pellet_notification_sent:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Low pellet level: %.1f%% (notification threshold: %.1f%%)",
                 percentage,
                 self._notification_level
@@ -959,7 +959,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             percentage <= self._shutdown_level and 
             not self._shutdown_notification_sent):
             
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Critical pellet level: %.1f%% (shutdown threshold: %.1f%%), initiating shutdown",
                 percentage,
                 self._shutdown_level
@@ -1048,7 +1048,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 elapsed = (datetime.now() - self._force_fan_started_at).total_seconds()
                 data["calculated"]["force_fan_running_seconds"] = int(elapsed)
             except (TypeError, AttributeError):
-                pass
+                _LOGGER.debug("Error force fan")
 
     async def _async_discover_stove(self) -> None:
         """Discover the stove on the network with retry logic and graceful fallback."""
@@ -1680,12 +1680,12 @@ class AduroCoordinator(DataUpdateCoordinator):
                                     value["last_updated"] = dt_module.datetime.fromisoformat(value["last_updated"])
                                     _LOGGER.debug("Converted last_updated to datetime")
                                 except (ValueError, TypeError) as e:
-                                    _LOGGER.warning("Failed to parse datetime: %s", e)
+                                    _LOGGER.debug("Failed to parse datetime: %s", e)
                                     value["last_updated"] = dt_module.datetime.now()
                             heating_obs[key_tuple] = value
                             _LOGGER.debug("Successfully added heating obs: count=%d", value.get("count", 0))
                         else:
-                            _LOGGER.warning("Key is not a tuple: %s (type: %s)", key_tuple, type(key_tuple))
+                            _LOGGER.debug("Key is not a tuple: %s (type: %s)", key_tuple, type(key_tuple))
                     except Exception as err:
                         _LOGGER.error("Failed to parse heating observation key '%s': %s", key_str, err, exc_info=True)
                 
@@ -2188,7 +2188,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                     consumption
                 )
             else:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Startup session invalid (duration: %.1fs, consumption: %.3f kg), not recording",
                     duration,
                     consumption
@@ -2339,7 +2339,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         
                         _LOGGER.info("Restart was INTERRUPTED (%s), not recording restart delta", ", ".join(reasons))
                 else:
-                    _LOGGER.warning("Cooling session too short (%.1f min), not recording", duration / 60)
+                    _LOGGER.debug("Cooling session too short (%.1f min), not recording", duration / 60)
                 
                 self._current_cooling_session = None
         
@@ -3602,7 +3602,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Check if stove is in wood mode (state 9)
         if current_state not in ["9"]:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Cannot resume - stove not in wood mode (current state: %s)",
                 current_state
             )
@@ -3949,13 +3949,13 @@ class AduroCoordinator(DataUpdateCoordinator):
                     await self.async_request_refresh()
                     return True
                 else:
-                    _LOGGER.warning(
+                    _LOGGER.debug(
                         "Command response not empty: %s = %s, response: %s",
                         path, value, data
                     )
                     
             except Exception as err:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Command attempt %d/%d failed: %s",
                     attempt + 1, retries, err
                 )
@@ -4046,7 +4046,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                     elapsed = (datetime.now() - self._low_wood_temp_start_time).total_seconds()
                     if elapsed >= self._low_wood_duration_threshold:
                         if not self._low_wood_alert_sent:
-                            _LOGGER.warning(
+                            _LOGGER.debug(
                                 "LOW WOOD MODE TEMPERATURE ALERT: %.1f°C for %d seconds (threshold: %.1f°C for %d seconds)",
                                 smoke_temp,
                                 int(elapsed),
@@ -4102,7 +4102,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         "exceeded_by": int(elapsed - self._high_smoke_duration_threshold),
                     }
             except (TypeError, AttributeError):
-                pass
+                _LOGGER.debug("Error calculating time information for high smoke temp")
         
         # Calculate time information for low wood temp
         low_wood_time_info = None
@@ -4122,7 +4122,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         "exceeded_by": int(elapsed - self._low_wood_duration_threshold),
                     }
             except (TypeError, AttributeError):
-                pass
+                _LOGGER.debug("Error calculating time information for low wood temp")
         
         # Store alert data
         data["alerts"]["high_smoke_temp_alert"] = {

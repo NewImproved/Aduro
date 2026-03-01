@@ -194,7 +194,7 @@ class AduroStartStopSwitch(AduroSwitchBase):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the stove."""
-        _LOGGER.info("Switch: Turning on stove")
+        _LOGGER.debug("Switch: Turning on stove")
         success = await self.coordinator.async_start_stove()
         
         if success:
@@ -205,7 +205,7 @@ class AduroStartStopSwitch(AduroSwitchBase):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the stove."""
-        _LOGGER.info("Switch: Turning off stove")
+        _LOGGER.debug("Switch: Turning off stove")
         success = await self.coordinator.async_stop_stove()
         
         if success:
@@ -254,14 +254,14 @@ class AduroAutoShutdownSwitch(AduroSwitchBase):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Enable auto-shutdown."""
-        _LOGGER.info("Switch: Enabling auto-shutdown at low pellet level")
+        _LOGGER.debug("Switch: Enabling auto-shutdown at low pellet level")
         self.coordinator.set_auto_shutdown_enabled(True)
         await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable auto-shutdown."""
-        _LOGGER.info("Switch: Disabling auto-shutdown at low pellet level")
+        _LOGGER.debug("Switch: Disabling auto-shutdown at low pellet level")
         self.coordinator.set_auto_shutdown_enabled(False)
         await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
@@ -312,14 +312,14 @@ class AduroAutoResumeAfterWoodSwitch(AduroSwitchBase):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Enable auto-resume after wood mode."""
-        _LOGGER.info("Switch: Enabling auto-resume after wood mode")
+        _LOGGER.debug("Switch: Enabling auto-resume after wood mode")
         self.coordinator.set_auto_resume_after_wood(True)
         await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable auto-resume after wood mode."""
-        _LOGGER.info("Switch: Disabling auto-resume after wood mode")
+        _LOGGER.debug("Switch: Disabling auto-resume after wood mode")
         self.coordinator.set_auto_resume_after_wood(False)
         await self.coordinator.async_save_pellet_data()
         await self.coordinator.async_request_refresh()
@@ -369,7 +369,7 @@ class AduroForceFanSwitch(AduroSwitchBase):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on force fan."""
-        _LOGGER.info("Switch: Turning on force fan")
+        _LOGGER.debug("Switch: Turning on force fan")
         success = await self.coordinator.async_start_force_fan()
         
         if success:
@@ -379,6 +379,6 @@ class AduroForceFanSwitch(AduroSwitchBase):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off force fan."""
-        _LOGGER.info("Switch: Turning off force fan")
+        _LOGGER.debug("Switch: Turning off force fan")
         await self.coordinator.async_stop_force_fan(reason="manual")
         await self.coordinator.async_request_refresh()

@@ -277,7 +277,7 @@ class AduroToggleModeButton(AduroButtonBase):
     async def async_press(self) -> None:
         """Handle button press."""
         if not self.coordinator.data:
-            _LOGGER.error("Button: No data available to toggle mode")
+            _LOGGER.debug("Button: No data available to toggle mode")
             return
         
         current_mode = self.coordinator.data.get("status", {}).get("operation_mode", 0)
@@ -341,13 +341,13 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
     async def async_press(self) -> None:
         """Handle button press."""
         if not self.coordinator.data or "operating" not in self.coordinator.data:
-            _LOGGER.error("Button: No data available to resume after wood mode")
+            _LOGGER.debug("Button: No data available to resume after wood mode")
             return
         
         current_state = self.coordinator.data["operating"].get("state", "")
         
         if current_state not in ["9"]:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Button: Cannot resume - stove not in wood mode (current state: %s)",
                 current_state
             )

@@ -1104,8 +1104,8 @@ class AduroCoordinator(DataUpdateCoordinator):
         # =========================================================================
         # DISCOVERY MODE WITH RETRIES
         # =========================================================================
-        max_retries = 10
-        retry_delay = 1  # seconds
+        max_retries = 2
+        retry_delay = 2  # seconds
         
         for attempt in range(max_retries):
             try:
@@ -1127,7 +1127,6 @@ class AduroCoordinator(DataUpdateCoordinator):
                             self.stove_ip = CLOUD_BACKUP_ADDRESS
                             self.last_discovery = datetime.now()
                             return
-                        retry_delay *= 2
                         continue
                     else:
                         _LOGGER.warning(

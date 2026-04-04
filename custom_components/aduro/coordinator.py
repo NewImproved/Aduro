@@ -485,7 +485,7 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     async def _process_state_changes(self, data: dict[str, Any]) -> None:
         """Process state changes and trigger auto-actions."""
-        if "operating" not in data:
+        if "operating" not in data or "status" not in data:
             return
         
         current_state = data["operating"].get("state")
@@ -1267,6 +1267,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "*"  # payload
             )
             
+            if response is None:
+                _LOGGER.warning("Status query returned None (stove not responding)")
+                return None
+            
             status = response.parse_payload().split(",")
             
             # Map status to STATUS_PARAMS
@@ -1301,6 +1305,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 11,  # function_id
                 "001*"  # payloadasync def _async_discover_stove(self) -> None:
             )
+            
+            if response is None:
+                _LOGGER.warning("Operating data query returned None (stove not responding)")
+                return None
             
             #data = response.parse_payload().split(',')
             payload = response.parse_payload() #
@@ -1371,6 +1379,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "wifi.router"  # payload
             )
             
+            if response is None:
+                _LOGGER.warning("Network data query returned None (stove not responding)")
+                return None
+            
             data = response.parse_payload().split(',')
             
             network_data = {
@@ -1414,14 +1426,24 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "total_days"  # payload
             )
             
+            if response is None:
+                _LOGGER.warning("Consumption daily data query returned None (stove not responding)")
+                return None
+            
             data = response.parse_payload().split(',')
             data[0] = data[0][11:]  # Remove "total_days" prefix
             
             today = date.today().day
             yesterday = (date.today() - timedelta(1)).day
             
-            consumption_data["day"] = float(data[today - 1]) if len(data) >= today else 0
-            consumption_data["yesterday"] = float(data[yesterday - 1]) if len(data) >= yesterday else 0
+            def safe_float(val):
+                try:
+                    return float(val) if val and val.strip() else 0.0
+                except (ValueError, TypeError):
+                    return 0.0
+            
+            consumption_data["day"] = safe_float(data[today - 1]) if len(data) >= today else 0
+            consumption_data["yesterday"] = safe_float(data[yesterday - 1]) if len(data) >= yesterday else 0
             
             # Get monthly consumption
             response = await self.hass.async_add_executor_job(
@@ -1432,6 +1454,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 6,  # function_id
                 "total_months"  # payload
             )
+            
+            if response is None:
+                _LOGGER.warning("Consumption monthly data query returned None (stove not responding)")
+                return None
             
             data = response.parse_payload().split(',')
             data[0] = data[0][13:]  # Remove "total_months" prefix
@@ -1452,7 +1478,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             for i, month_name in enumerate(month_names):
                 if i < len(data):
-                    monthly_history[month_name] = float(data[i])
+                    monthly_history[month_name] = safe_float(data[i])
             
             consumption_data["monthly_history"] = monthly_history
             
@@ -1548,6 +1574,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "total_years"  # payload
             )
             
+            if response is None:
+                _LOGGER.warning("Consumption yearly data query returned None (stove not responding)")
+                return None
+            
             data = response.parse_payload().split(',')
             data[0] = data[0][12:]  # Remove "total_years" prefix
             
@@ -1556,7 +1586,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             base_year = 2013  # Stove started tracking from 2013
             for i in range(len(data)):
                 year_label = base_year + i
-                yearly_history[str(year_label)] = float(data[i])
+                yearly_history[str(year_label)] = safe_float(data[i])
             
             consumption_data["yearly_history"] = yearly_history
             
@@ -1918,6 +1948,15 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             try:
                 # Call the weather.get_forecasts service
+                # Verify entity exists before calling service
+                state = self.hass.states.get(self._weather_forecast_sensor)
+                if state is None:
+                    _LOGGER.warning(
+                        "Weather forecast entity '%s' not found, skipping forecast update",
+                        self._weather_forecast_sensor
+                    )
+                    return
+                
                 response = await self.hass.services.async_call(
                     "weather",
                     "get_forecasts",

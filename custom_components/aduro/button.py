@@ -162,7 +162,7 @@ class AduroRefillPelletsButton(AduroButtonBase):
 
     async def async_press(self) -> None:
         """Handle button press."""
-        _LOGGER.info("Button: Pellets refilled - resetting per-refill consumption counter")
+        _LOGGER.debug("Button: Pellets refilled - resetting per-refill consumption counter")
         
         # Get current consumption before reset for logging
         consumed = 0
@@ -174,7 +174,7 @@ class AduroRefillPelletsButton(AduroButtonBase):
         # Reset pellet consumption (only per-refill counter)
         self.coordinator.refill_pellets()
         
-        _LOGGER.info(
+        _LOGGER.debug(
             "Button: Per-refill consumption reset from %.1f kg, total since cleaning: %.1f kg",
             consumed,
             consumed_total
@@ -207,7 +207,7 @@ class AduroCleanStoveButton(AduroButtonBase):
 
     async def async_press(self) -> None:
         """Handle button press."""
-        _LOGGER.info("Button: Stove cleaned - resetting total consumption counter")
+        _LOGGER.debug("Button: Stove cleaned - resetting total consumption counter")
         
         # Get current counter before reset for logging
         consumed_total = 0
@@ -217,7 +217,7 @@ class AduroCleanStoveButton(AduroButtonBase):
         # Reset total consumption counter
         self.coordinator.reset_refill_counter()
         
-        _LOGGER.info(
+        _LOGGER.debug(
             "Button: Total consumption counter reset from %.1f kg to 0 after cleaning",
             consumed_total
         )
@@ -277,13 +277,13 @@ class AduroToggleModeButton(AduroButtonBase):
     async def async_press(self) -> None:
         """Handle button press."""
         if not self.coordinator.data:
-            _LOGGER.error("Button: No data available to toggle mode")
+            _LOGGER.debug("Button: No data available to toggle mode")
             return
         
         current_mode = self.coordinator.data.get("status", {}).get("operation_mode", 0)
         mode_names = {0: "Heat Level", 1: "Temperature", 2: "Wood"}
         
-        _LOGGER.info(
+        _LOGGER.debug(
             "Button: Toggling mode from %s to %s",
             mode_names.get(current_mode, current_mode),
             mode_names.get(1 if current_mode == 0 else 0, "other")
@@ -292,7 +292,7 @@ class AduroToggleModeButton(AduroButtonBase):
         success = await self.coordinator.async_toggle_mode()
         
         if success:
-            _LOGGER.info("Button: Mode toggle initiated successfully")
+            _LOGGER.debug("Button: Mode toggle initiated successfully")
             # Request immediate update
             await self.coordinator.async_request_refresh()
         else:
@@ -341,24 +341,24 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
     async def async_press(self) -> None:
         """Handle button press."""
         if not self.coordinator.data or "operating" not in self.coordinator.data:
-            _LOGGER.error("Button: No data available to resume after wood mode")
+            _LOGGER.debug("Button: No data available to resume after wood mode")
             return
         
         current_state = self.coordinator.data["operating"].get("state", "")
         
         if current_state not in ["9"]:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Button: Cannot resume - stove not in wood mode (current state: %s)",
                 current_state
             )
             return
         
-        _LOGGER.info("Button: Manually resuming pellet operation after wood mode")
+        _LOGGER.debug("Button: Manually resuming pellet operation after wood mode")
         
         success = await self.coordinator.async_resume_after_wood_mode()
         
         if success:
-            _LOGGER.info("Button: Resume initiated successfully")
+            _LOGGER.debug("Button: Resume initiated successfully")
             # Request immediate update
             await self.coordinator.async_request_refresh()
         else:
@@ -375,12 +375,12 @@ class AduroForceAugerButton(AduroButtonBase):
 
     async def async_press(self) -> None:
         """Handle button press."""
-        _LOGGER.info("Button: Forcing auger to run")
+        _LOGGER.debug("Button: Forcing auger to run")
         
         success = await self.coordinator.async_force_auger()
         
         if success:
-            _LOGGER.info("Button: Auger forced successfully")
+            _LOGGER.debug("Button: Auger forced successfully")
             # Request immediate update
             await self.coordinator.async_request_refresh()
         else:
@@ -397,12 +397,12 @@ class AduroResetAlarmButton(AduroButtonBase):
 
     async def async_press(self) -> None:
         """Handle button press."""
-        _LOGGER.info("Button: reset alarm")
+        _LOGGER.debug("Button: reset alarm")
         
         success = await self.coordinator.async_reset_alarm()
         
         if success:
-            _LOGGER.info("Button: Alarm reset successfully")
+            _LOGGER.debug("Button: Alarm reset successfully")
             # Request immediate update
             await self.coordinator.async_request_refresh()
         else:

@@ -30,6 +30,7 @@ from .const import (
     HEAT_LEVEL_DISPLAY,
     STATE_NAMES,
     SUBSTATE_NAMES,
+    SUBSTATE_NAMES_DISPLAY,
 )
 from .coordinator import AduroCoordinator
 

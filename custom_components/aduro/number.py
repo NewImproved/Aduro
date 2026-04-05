@@ -183,7 +183,7 @@ class AduroNumberBase(CoordinatorEntity, NumberEntity):
         async def _send_after_delay():
             try:
                 await asyncio.sleep(delay)
-                _LOGGER.info(
+                _LOGGER.debug(
                     "%s: Debounce complete, sending value: %s",
                     self._attr_translation_key,
                     self._pending_value
@@ -260,7 +260,7 @@ class AduroHeatlevelNumber(AduroNumberBase):
     async def _actually_set_value(self, value: float) -> None:
         """Actually send the heat level to the stove."""
         heatlevel = int(value)
-        _LOGGER.info("Number: Actually setting heat level to %s", heatlevel)
+        _LOGGER.debug("Number: Actually setting heat level to %s", heatlevel)
         
         success = await self.coordinator.async_set_heatlevel(heatlevel)
         
@@ -328,7 +328,7 @@ class AduroTemperatureNumber(AduroNumberBase):
     async def _actually_set_value(self, value: float) -> None:
         """Actually send the temperature to the stove."""
         temperature = float(value)
-        _LOGGER.info("Number: Actually setting target temperature to %s°C", temperature)
+        _LOGGER.debug("Number: Actually setting target temperature to %s°C", temperature)
         
         success = await self.coordinator.async_set_temperature(temperature)
         
@@ -376,7 +376,7 @@ class AduroPelletCapacityNumber(AduroNumberBase):
     async def async_set_native_value(self, value: float) -> None:
         """Set the pellet capacity - no debouncing needed for config values."""
         capacity = float(value)
-        _LOGGER.info("Number: Setting pellet capacity to %s kg", capacity)
+        _LOGGER.debug("Number: Setting pellet capacity to %s kg", capacity)
         
         self.coordinator.set_pellet_capacity(capacity)
         await self.coordinator.async_request_refresh()
@@ -426,7 +426,7 @@ class AduroNotificationLevelNumber(AduroNumberBase):
     async def async_set_native_value(self, value: float) -> None:
         """Set the notification level - no debouncing needed for config values."""
         level = float(value)
-        _LOGGER.info("Number: Setting notification level to %s%%", level)
+        _LOGGER.debug("Number: Setting notification level to %s%%", level)
         
         self.coordinator.set_notification_level(level)
         await self.coordinator.async_request_refresh()
@@ -477,7 +477,7 @@ class AduroShutdownLevelNumber(AduroNumberBase):
     async def async_set_native_value(self, value: float) -> None:
         """Set the shutdown level - no debouncing needed for config values."""
         level = float(value)
-        _LOGGER.info("Number: Setting shutdown level to %s%%", level)
+        _LOGGER.debug("Number: Setting shutdown level to %s%%", level)
         
         self.coordinator.set_shutdown_level(level)
         await self.coordinator.async_request_refresh()
@@ -525,7 +525,7 @@ class AduroHighSmokeTempThresholdNumber(AduroNumberBase):
     async def async_set_native_value(self, value: float) -> None:
         """Set the threshold temperature."""
         temperature = float(value)
-        _LOGGER.info("Number: Setting high smoke temp threshold to %s°C", temperature)
+        _LOGGER.debug("Number: Setting high smoke temp threshold to %s°C", temperature)
         
         self.coordinator.set_high_smoke_temp_threshold(temperature)
         await self.coordinator.async_request_refresh()
@@ -577,7 +577,7 @@ class AduroHighSmokeDurationThresholdNumber(AduroNumberBase):
     async def async_set_native_value(self, value: float) -> None:
         """Set the duration threshold."""
         duration = int(value)
-        _LOGGER.info("Number: Setting high smoke duration threshold to %s seconds", duration)
+        _LOGGER.debug("Number: Setting high smoke duration threshold to %s seconds", duration)
         
         self.coordinator.set_high_smoke_duration_threshold(duration)
         await self.coordinator.async_request_refresh()
@@ -630,7 +630,7 @@ class AduroLowWoodTempThresholdNumber(AduroNumberBase):
     async def async_set_native_value(self, value: float) -> None:
         """Set the threshold temperature."""
         temperature = float(value)
-        _LOGGER.info("Number: Setting low wood temp threshold to %s°C", temperature)
+        _LOGGER.debug("Number: Setting low wood temp threshold to %s°C", temperature)
         
         self.coordinator.set_low_wood_temp_threshold(temperature)
         await self.coordinator.async_request_refresh()
@@ -684,7 +684,7 @@ class AduroLowWoodDurationThresholdNumber(AduroNumberBase):
     async def async_set_native_value(self, value: float) -> None:
         """Set the duration threshold."""
         duration = int(value)
-        _LOGGER.info("Number: Setting low wood duration threshold to %s seconds", duration)
+        _LOGGER.debug("Number: Setting low wood duration threshold to %s seconds", duration)
         
         self.coordinator.set_low_wood_duration_threshold(duration)
         await self.coordinator.async_request_refresh()
@@ -738,7 +738,7 @@ class AduroForceFanMaxDurationNumber(AduroNumberBase):
     async def async_set_native_value(self, value: float) -> None:
         """Set the max duration - no debouncing needed for config values."""
         duration = int(value)
-        _LOGGER.info("Number: Setting force fan max duration to %s minutes", duration)
+        _LOGGER.debug("Number: Setting force fan max duration to %s minutes", duration)
         
         self.coordinator.set_force_fan_max_duration(duration)
         await self.coordinator.async_request_refresh()

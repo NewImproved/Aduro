@@ -43,7 +43,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await _load_options(coordinator, entry)
     
     # Perform initial data fetch
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception:
+        _LOGGER.warning("Could not reach stove on first refresh, will retry in background")
 
     # Store coordinator
     hass.data[DOMAIN][entry.entry_id] = coordinator
@@ -87,7 +90,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if coordinator._force_fan_active:
         try:
             await coordinator._async_send_command("manual.manual_mode", 0)
-            _LOGGER.info("Exited manual mode on unload")
+            _LOGGER.debug("Exited manual mode on unload")
         except Exception as err:
             _LOGGER.warning("Failed to exit manual mode on unload: %s", err)
     
@@ -143,7 +146,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_start_stove()
                 if success:
-                    _LOGGER.info("Stove started successfully")
+                    _LOGGER.debug("Stove started successfully")
                 else:
                     _LOGGER.error("Failed to start stove")
 
@@ -154,7 +157,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_stop_stove()
                 if success:
-                    _LOGGER.info("Stove stopped successfully")
+                    _LOGGER.debug("Stove stopped successfully")
                 else:
                     _LOGGER.error("Failed to stop stove")
 
@@ -167,7 +170,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_set_heatlevel(heatlevel)
                 if success:
-                    _LOGGER.info("Heat level set to %s", heatlevel)
+                    _LOGGER.debug("Heat level set to %s", heatlevel)
                 else:
                     _LOGGER.error("Failed to set heat level")
 
@@ -180,7 +183,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_set_temperature(temperature)
                 if success:
-                    _LOGGER.info("Temperature set to %s", temperature)
+                    _LOGGER.debug("Temperature set to %s", temperature)
                 else:
                     _LOGGER.error("Failed to set temperature")
 
@@ -193,7 +196,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_set_operation_mode(mode)
                 if success:
-                    _LOGGER.info("Operation mode set to %s", mode)
+                    _LOGGER.debug("Operation mode set to %s", mode)
                 else:
                     _LOGGER.error("Failed to set operation mode")
 
@@ -213,7 +216,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
                 
                 success = await coord.async_set_operation_mode(new_mode)
                 if success:
-                    _LOGGER.info("Toggled operation mode from %s to %s", current_mode, new_mode)
+                    _LOGGER.debug("Toggled operation mode from %s to %s", current_mode, new_mode)
                 else:
                     _LOGGER.error("Failed to toggle operation mode")
 
@@ -225,7 +228,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_force_auger()
                 if success:
-                    _LOGGER.info("Auger forced successfully")
+                    _LOGGER.debug("Auger forced successfully")
                 else:
                     _LOGGER.error("Failed to force auger")
 
@@ -237,7 +240,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_reset_alarm()
                 if success:
-                    _LOGGER.info("Alarm reset successfully")
+                    _LOGGER.debug("Alarm reset successfully")
                 else:
                     _LOGGER.error("Failed to reset alarm")
 
@@ -251,7 +254,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_set_custom(path, value)
                 if success:
-                    _LOGGER.info("Custom parameter set: %s = %s", path, value)
+                    _LOGGER.debug("Custom parameter set: %s = %s", path, value)
                 else:
                     _LOGGER.error("Failed to set custom parameter")
 
@@ -263,7 +266,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
             if isinstance(coord, AduroCoordinator):
                 success = await coord.async_resume_after_wood_mode()
                 if success:
-                    _LOGGER.info("Resumed pellet operation after wood mode")
+                    _LOGGER.debug("Resumed pellet operation after wood mode")
                 else:
                     _LOGGER.error("Failed to resume after wood mode")
 
@@ -350,7 +353,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: AduroCoordinato
         handle_resume_after_wood,
     )
 
-    _LOGGER.info("Aduro services registered")
+    _LOGGER.debug("Aduro services registered")
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:
@@ -382,4 +385,4 @@ async def async_unload_services(hass: HomeAssistant) -> None:
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)
 
-    _LOGGER.info("Aduro services unregistered")
+    _LOGGER.debug("Aduro services unregistered")

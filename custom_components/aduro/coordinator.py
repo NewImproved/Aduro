@@ -319,7 +319,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             # Handle auto-resume after wood mode
             if data.get("auto_resume_wood_mode", False):
-                _LOGGER.info("Auto-resuming pellet operation after wood mode")
+                _LOGGER.debug("Auto-resuming pellet operation after wood mode")
                 await self._async_resume_pellet_operation()
             
             # Update timers
@@ -485,7 +485,7 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     async def _process_state_changes(self, data: dict[str, Any]) -> None:
         """Process state changes and trigger auto-actions."""
-        if "operating" not in data:
+        if "operating" not in data or "status" not in data:
             return
         
         current_state = data["operating"].get("state")
@@ -509,7 +509,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Entering wood mode - ONLY save settings, don't resume yet
         if is_in_wood_mode and not self._was_in_wood_mode:
-            _LOGGER.info("Entering wood mode (state: %s), saving pellet mode settings", current_state)
+            _LOGGER.debug("Entering wood mode (state: %s), saving pellet mode settings", current_state)
             self._pre_wood_mode_operation_mode = current_operation_mode
             self._pre_wood_mode_heatlevel = current_heatlevel
             self._pre_wood_mode_temperature = current_temperature_ref
@@ -518,7 +518,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             # Log that we'll monitor for auto-resume
             if self._auto_resume_after_wood and current_operation_mode == 0:
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Auto-resume enabled (heat level mode) - will monitor smoke temp to resume when fire is dying (threshold: 110°C)"
                 )
         
@@ -530,7 +530,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 smoke_temp <= 110 and
                 not self._auto_resume_sent):  # Only if we haven't sent it yet
                 
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Fire is dying (smoke temp: %.1f°C <= 110°C), sending auto-resume command",
                     smoke_temp
                 )
@@ -543,7 +543,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Exiting wood mode - clear flags
         if not is_in_wood_mode and self._was_in_wood_mode:
-            _LOGGER.info("Exiting wood mode, was in state: %s", self._previous_state)
+            _LOGGER.debug("Exiting wood mode, was in state: %s", self._previous_state)
             self._was_in_wood_mode = False
             self._auto_resume_sent = False  # Reset for next wood mode session
 
@@ -583,12 +583,12 @@ class AduroCoordinator(DataUpdateCoordinator):
             current_state in SHUTDOWN_STATES and 
             self._previous_state not in SHUTDOWN_STATES):
             
-            _LOGGER.info("Stove stopped externally, state: %s", current_state)
+            _LOGGER.debug("Stove stopped externally, state: %s", current_state)
             data["auto_stop_detected"] = True
             
             # CRITICAL FIX: Clear ALL pending changes and targets when externally stopped
             if self._change_in_progress or self._toggle_heat_target:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Clearing pending changes due to external stop command - "
                     "was targeting: HL=%s, Temp=%s, Mode=%s",
                     self._target_heatlevel,
@@ -616,7 +616,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             # Mark that no app change should be detected since we're handling the stop
             data["app_change_detected"] = False
             
-            _LOGGER.info("All pending commands cleared - stove will remain off")
+            _LOGGER.debug("All pending commands cleared - stove will remain off")
             return
 
         # Detect external changes (from app)
@@ -629,7 +629,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 if (self._previous_heatlevel is not None and 
                     current_heatlevel != self._previous_heatlevel):
                     app_change_detected = True
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "External heatlevel change detected: %s -> %s (power_pct: %d%%)",
                         self._previous_heatlevel,
                         current_heatlevel,
@@ -642,7 +642,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 if (self._previous_temperature is not None and 
                     current_temperature_ref != self._previous_temperature):
                     app_change_detected = True
-                    _LOGGER.info("External temperature change detected: %s -> %s", 
+                    _LOGGER.debug("External temperature change detected: %s -> %s", 
                             self._previous_temperature, current_temperature_ref)
                     # Always update our target to match current value
                     self._target_temperature = current_temperature_ref
@@ -651,7 +651,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             if (self._previous_operation_mode is not None and 
                 current_operation_mode != self._previous_operation_mode):
                 app_change_detected = True
-                _LOGGER.info("External operation mode change detected: %s -> %s",
+                _LOGGER.debug("External operation mode change detected: %s -> %s",
                         self._previous_operation_mode, current_operation_mode)
                 self._target_operation_mode = current_operation_mode
         else:
@@ -662,7 +662,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         if (self._previous_state is not None and 
             current_state in STARTUP_STATES and 
             self._previous_state not in STARTUP_STATES):
-            _LOGGER.info("Stove started, state: %s", current_state)
+            _LOGGER.debug("Stove started, state: %s", current_state)
             data["auto_start_detected"] = True
 
         # Update targets to match current values when external change detected
@@ -677,7 +677,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             # ADDED: Clear change_in_progress when external change is detected
             # This prevents resending old commands
             if self._change_in_progress:
-                _LOGGER.info("External change detected - clearing change_in_progress flag")
+                _LOGGER.debug("External change detected - clearing change_in_progress flag")
                 self._change_in_progress = False
                 self._toggle_heat_target = False
                 self._mode_change_started = None
@@ -729,7 +729,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 change_complete = False
         
         if change_complete:
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Mode change completed - HL: %s, Temp: %s, Mode: %s",
                 current_heatlevel,
                 current_temperature_ref,
@@ -751,14 +751,14 @@ class AduroCoordinator(DataUpdateCoordinator):
             try:
                 elapsed = (datetime.now() - self._mode_change_started).total_seconds()
             except TypeError:
-                _LOGGER.warning("Invalid _mode_change_started timestamp, resetting")
+                _LOGGER.debug("Invalid _mode_change_started timestamp, resetting")
                 self._mode_change_started = datetime.now()
                 elapsed = 0
             
             # Try resending after TIMEOUT_COMMAND_RESPONSE
             if elapsed > TIMEOUT_COMMAND_RESPONSE and self._resend_attempt < self._max_resend_attempts:
                 self._resend_attempt += 1
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Mode change timeout, resending command (attempt %d/%d)",
                     self._resend_attempt,
                     self._max_resend_attempts
@@ -874,7 +874,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Initialize on first run
         if not hasattr(self, '_last_consumption_day_value'):
             self._last_consumption_day_value = current_day_consumption
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Initialized consumption tracking: baseline=%.2f kg",
                 current_day_consumption
             )
@@ -884,7 +884,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Handle midnight reset (consumption_day decreased)
         if consumption_change < 0:
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Midnight reset detected - consumption_day went from %.2f to %.2f kg",
                 self._last_consumption_day_value,
                 current_day_consumption
@@ -942,7 +942,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # Check for low pellet notification
         if percentage <= self._notification_level and not self._low_pellet_notification_sent:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Low pellet level: %.1f%% (notification threshold: %.1f%%)",
                 percentage,
                 self._notification_level
@@ -959,7 +959,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             percentage <= self._shutdown_level and 
             not self._shutdown_notification_sent):
             
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Critical pellet level: %.1f%% (shutdown threshold: %.1f%%), initiating shutdown",
                 percentage,
                 self._shutdown_level
@@ -1048,7 +1048,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 elapsed = (datetime.now() - self._force_fan_started_at).total_seconds()
                 data["calculated"]["force_fan_running_seconds"] = int(elapsed)
             except (TypeError, AttributeError):
-                pass
+                _LOGGER.debug("Error force fan")
 
     async def _async_discover_stove(self) -> None:
         """Discover the stove on the network with retry logic and graceful fallback."""
@@ -1057,7 +1057,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         # FIXED IP MODE
         # =========================================================================
         if self.fixed_ip:
-            _LOGGER.info("Using configured fixed IP: %s", self.fixed_ip)
+            _LOGGER.debug("Using configured fixed IP: %s", self.fixed_ip)
             self.stove_ip = self.fixed_ip
             self.last_discovery = datetime.now()
             
@@ -1104,8 +1104,8 @@ class AduroCoordinator(DataUpdateCoordinator):
         # =========================================================================
         # DISCOVERY MODE WITH RETRIES
         # =========================================================================
-        max_retries = 10
-        retry_delay = 1  # seconds
+        max_retries = 2
+        retry_delay = 2  # seconds
         
         for attempt in range(max_retries):
             try:
@@ -1120,11 +1120,15 @@ class AduroCoordinator(DataUpdateCoordinator):
                     
                     if attempt < max_retries - 1:
                         _LOGGER.debug("Waiting %d seconds before retry...", retry_delay)
-                        await asyncio.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff (1s, 2s, 4s)
+                        try:
+                            await asyncio.sleep(retry_delay)
+                        except asyncio.CancelledError:
+                            _LOGGER.warning("Sleep cancelled, falling back to cloud backup")
+                            self.stove_ip = CLOUD_BACKUP_ADDRESS
+                            self.last_discovery = datetime.now()
+                            return
                         continue
                     else:
-                        # All retries exhausted
                         _LOGGER.warning(
                             "All %d discovery attempts failed, using cloud backup: %s",
                             max_retries,
@@ -1138,31 +1142,28 @@ class AduroCoordinator(DataUpdateCoordinator):
                 data = response.parse_payload()
                 discovered_ip = data.get("IP", CLOUD_BACKUP_ADDRESS)
                 
-                # Store previous versions to detect changes
                 old_version = self.firmware_version
                 old_build = self.firmware_build
                 
                 self.firmware_version = data.get("Ver")
                 self.firmware_build = data.get("Build")
                 
-                # Validate discovered IP
                 if not discovered_ip or "0.0.0.0" in discovered_ip:
                     _LOGGER.warning("Invalid discovered IP (%s), using cloud backup", discovered_ip)
                     self.stove_ip = CLOUD_BACKUP_ADDRESS
                 else:
                     self.stove_ip = discovered_ip
-                    _LOGGER.info("Successfully discovered stove at: %s", self.stove_ip)
+                    _LOGGER.debug("Successfully discovered stove at: %s", self.stove_ip)
                 
                 self.last_discovery = datetime.now()
                 
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Discovered stove at: %s (Firmware: %s Build: %s)",
                     self.stove_ip,
                     self.firmware_version,
                     self.firmware_build,
                 )
                 
-                # Check if firmware changed
                 version_changed = (old_version != self.firmware_version or 
                                 old_build != self.firmware_build)
                 
@@ -1177,22 +1178,39 @@ class AduroCoordinator(DataUpdateCoordinator):
                     await self._update_device_registry()
                 
                 return  # Success!
+
+            except asyncio.CancelledError:
+                # HA is cancelling setup - fall back to cloud immediately, don't retry
+                _LOGGER.warning("Discovery cancelled by HA, falling back to cloud backup")
+                self.stove_ip = CLOUD_BACKUP_ADDRESS
+                self.last_discovery = datetime.now()
+                return  # Do NOT re-raise, just use cloud
                 
             except Exception as err:
                 _LOGGER.warning("Discovery attempt %d/%d failed with exception: %s", 
                             attempt + 1, max_retries, err)
                 
-                if attempt < max_retries - 1:
-                    _LOGGER.debug("Waiting %d seconds before retry...", retry_delay)
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
+                # If port is still in use from a previous cancelled attempt, wait longer
+                if "Address in use" in str(err):
+                    _LOGGER.debug("Port still in use, waiting 5 seconds for OS to release it...")
+                    wait_time = 5
+                elif attempt < max_retries - 1:
+                    wait_time = retry_delay
+                    retry_delay *= 2
                 else:
-                    # All retries exhausted
                     _LOGGER.warning(
                         "All %d discovery attempts failed, using cloud backup: %s",
                         max_retries,
                         CLOUD_BACKUP_ADDRESS
                     )
+                    self.stove_ip = CLOUD_BACKUP_ADDRESS
+                    self.last_discovery = datetime.now()
+                    return
+
+                try:
+                    await asyncio.sleep(wait_time)
+                except asyncio.CancelledError:
+                    _LOGGER.warning("Sleep cancelled, falling back to cloud backup")
                     self.stove_ip = CLOUD_BACKUP_ADDRESS
                     self.last_discovery = datetime.now()
                     return
@@ -1249,6 +1267,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "*"  # payload
             )
             
+            if response is None:
+                _LOGGER.warning("Status query returned None (stove not responding)")
+                return None
+            
             status = response.parse_payload().split(",")
             
             # Map status to STATUS_PARAMS
@@ -1283,6 +1305,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 11,  # function_id
                 "001*"  # payloadasync def _async_discover_stove(self) -> None:
             )
+            
+            if response is None:
+                _LOGGER.warning("Operating data query returned None (stove not responding)")
+                return None
             
             #data = response.parse_payload().split(',')
             payload = response.parse_payload() #
@@ -1353,6 +1379,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "wifi.router"  # payload
             )
             
+            if response is None:
+                _LOGGER.warning("Network data query returned None (stove not responding)")
+                return None
+            
             data = response.parse_payload().split(',')
             
             network_data = {
@@ -1396,14 +1426,24 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "total_days"  # payload
             )
             
+            if response is None:
+                _LOGGER.warning("Consumption daily data query returned None (stove not responding)")
+                return None
+            
             data = response.parse_payload().split(',')
             data[0] = data[0][11:]  # Remove "total_days" prefix
             
             today = date.today().day
             yesterday = (date.today() - timedelta(1)).day
             
-            consumption_data["day"] = float(data[today - 1]) if len(data) >= today else 0
-            consumption_data["yesterday"] = float(data[yesterday - 1]) if len(data) >= yesterday else 0
+            def safe_float(val):
+                try:
+                    return float(val) if val and val.strip() else 0.0
+                except (ValueError, TypeError):
+                    return 0.0
+            
+            consumption_data["day"] = safe_float(data[today - 1]) if len(data) >= today else 0
+            consumption_data["yesterday"] = safe_float(data[yesterday - 1]) if len(data) >= yesterday else 0
             
             # Get monthly consumption
             response = await self.hass.async_add_executor_job(
@@ -1414,6 +1454,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 6,  # function_id
                 "total_months"  # payload
             )
+            
+            if response is None:
+                _LOGGER.warning("Consumption monthly data query returned None (stove not responding)")
+                return None
             
             data = response.parse_payload().split(',')
             data[0] = data[0][13:]  # Remove "total_months" prefix
@@ -1434,14 +1478,14 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             for i, month_name in enumerate(month_names):
                 if i < len(data):
-                    monthly_history[month_name] = float(data[i])
+                    monthly_history[month_name] = safe_float(data[i])
             
             consumption_data["monthly_history"] = monthly_history
             
             # Initialize snapshots for all months if not already done
             # This allows us to start tracking immediately
             if not hasattr(self, '_snapshots_initialized') or not self._snapshots_initialized:
-                _LOGGER.info("Initializing consumption snapshots from current data")
+                _LOGGER.debug("Initializing consumption snapshots from current data")
                 for i, month_name in enumerate(month_names):
                     if i < len(data):
                         value = float(data[i])
@@ -1515,7 +1559,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         year_to_date += value
                         months_included.append(month_names[i])
             
-            _LOGGER.info(
+            _LOGGER.debug(
                 f"Yearly consumption calculated for {current_year}: {year_to_date:.2f} kg "
                 f"(months: {', '.join(months_included)})"
             )
@@ -1530,6 +1574,10 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "total_years"  # payload
             )
             
+            if response is None:
+                _LOGGER.warning("Consumption yearly data query returned None (stove not responding)")
+                return None
+            
             data = response.parse_payload().split(',')
             data[0] = data[0][12:]  # Remove "total_years" prefix
             
@@ -1538,7 +1586,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             base_year = 2013  # Stove started tracking from 2013
             for i in range(len(data)):
                 year_label = base_year + i
-                yearly_history[str(year_label)] = float(data[i])
+                yearly_history[str(year_label)] = safe_float(data[i])
             
             consumption_data["yearly_history"] = yearly_history
             
@@ -1625,7 +1673,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._force_fan_max_duration = data.get("force_fan_max_duration", 60)
 
                 # Load learning data (convert string keys back to tuples)
-                _LOGGER.info("=== Starting to load learning data ===")
+                _LOGGER.debug("=== Starting to load learning data ===")
                 
                 loaded_learning_data = data.get("learning_data", {
                     "heating_observations": {},
@@ -1640,9 +1688,9 @@ class AduroCoordinator(DataUpdateCoordinator):
                 })
                 
                 
-                _LOGGER.info("Found %d heating observations in file", 
+                _LOGGER.debug("Found %d heating observations in file", 
                            len(loaded_learning_data.get("heating_observations", {})))
-                _LOGGER.info("Found %d cooling observations in file", 
+                _LOGGER.debug("Found %d cooling observations in file", 
                            len(loaded_learning_data.get("cooling_observations", {})))
                 
                 # Convert heating observations string keys back to tuples
@@ -1661,12 +1709,12 @@ class AduroCoordinator(DataUpdateCoordinator):
                                     value["last_updated"] = dt_module.datetime.fromisoformat(value["last_updated"])
                                     _LOGGER.debug("Converted last_updated to datetime")
                                 except (ValueError, TypeError) as e:
-                                    _LOGGER.warning("Failed to parse datetime: %s", e)
+                                    _LOGGER.debug("Failed to parse datetime: %s", e)
                                     value["last_updated"] = dt_module.datetime.now()
                             heating_obs[key_tuple] = value
                             _LOGGER.debug("Successfully added heating obs: count=%d", value.get("count", 0))
                         else:
-                            _LOGGER.warning("Key is not a tuple: %s (type: %s)", key_tuple, type(key_tuple))
+                            _LOGGER.debug("Key is not a tuple: %s (type: %s)", key_tuple, type(key_tuple))
                     except Exception as err:
                         _LOGGER.error("Failed to parse heating observation key '%s': %s", key_str, err, exc_info=True)
                 
@@ -1760,7 +1808,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                     self._learning_data["startup_observations"]["avg_duration"]
                 )
 
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Loaded shutdown/restart deltas: shutdown (count=%d, avg=%.2f°C), restart (count=%d, avg=%.2f°C)",
                     self._learning_data["shutdown_restart_deltas"]["shutdown"]["count"],
                     self._learning_data["shutdown_restart_deltas"]["shutdown"]["avg_delta"],
@@ -1771,7 +1819,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 # Log consumption observations
                 for hl in [1, 2, 3]:
                     cons_obs = self._learning_data["consumption_observations"].get(hl, {})
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "Loaded consumption HL%d: count=%d, avg=%.3f kg/h",
                         hl,
                         cons_obs.get("count", 0),
@@ -1788,7 +1836,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._learning_consumption_total = data.get("learning_consumption_total", 0.0)
                 self._last_consumption_day_for_learning = data.get("last_consumption_day_for_learning")
 
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Loaded learning data: %d heating observations, %d cooling observations",
                     len(self._learning_data.get("heating_observations", {})),
                     len(self._learning_data.get("cooling_observations", {}))
@@ -1801,7 +1849,7 @@ class AduroCoordinator(DataUpdateCoordinator):
 
                 # Debug: Log first few observations
                 for key, obs in list(self._learning_data["heating_observations"].items())[:3]:
-                    _LOGGER.info("Sample heating obs: key=%s, count=%d, heating_rate=%.2f", 
+                    _LOGGER.debug("Sample heating obs: key=%s, count=%d, heating_rate=%.2f", 
                                 key, obs.get("count", 0), obs.get("avg_heating_rate", 0))
 
                 # Convert last_consumption_day string back to date object
@@ -1900,6 +1948,15 @@ class AduroCoordinator(DataUpdateCoordinator):
             
             try:
                 # Call the weather.get_forecasts service
+                # Verify entity exists before calling service
+                state = self.hass.states.get(self._weather_forecast_sensor)
+                if state is None:
+                    _LOGGER.warning(
+                        "Weather forecast entity '%s' not found, skipping forecast update",
+                        self._weather_forecast_sensor
+                    )
+                    return
+                
                 response = await self.hass.services.async_call(
                     "weather",
                     "get_forecasts",
@@ -1952,7 +2009,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                     self._forecast_data = normalized
                     self._forecast_last_updated = now
                     
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "Updated weather forecast cache: %d hourly entries from %s to %s",
                         len(normalized),
                         normalized[0]["datetime"].strftime("%Y-%m-%d %H:%M"),
@@ -2007,7 +2064,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         obs["count"] += 1
         obs["last_updated"] = datetime.now()
         
-        _LOGGER.info(
+        _LOGGER.debug(
             "Recorded heating observation: HL=%d, temp_delta=%.1f°C, outdoor=%s°C, "
             "heating_rate=%.2f°C/h (count=%d)",
             heatlevel, temp_delta_bucket, outdoor_bucket, heating_rate, obs["count"]
@@ -2028,7 +2085,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         cons_obs["avg_consumption_rate"] = cons_obs["total_consumption_rate"] / (cons_obs["count"] + 1)
         cons_obs["count"] += 1
         
-        _LOGGER.info(
+        _LOGGER.debug(
             "Recorded consumption observation: HL=%d, consumption_rate=%.3f kg/h (count=%d, avg=%.3f kg/h)",
             heatlevel, consumption_rate, cons_obs["count"], cons_obs["avg_consumption_rate"]
         )
@@ -2072,7 +2129,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         obs["count"] += 1
         obs["last_updated"] = datetime.now()
         
-        _LOGGER.info(
+        _LOGGER.debug(
             "Recorded cooling observation: start_temp=%.1f°C, outdoor=%s°C, "
             "cooling_rate=%.2f°C/h (count=%d)",
             start_room_temp, outdoor_bucket, cooling_rate, obs["count"]
@@ -2098,7 +2155,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         )
         startup["count"] += 1
         
-        _LOGGER.info(
+        _LOGGER.debug(
             "Recorded startup observation: consumption=%.3f kg, duration=%d sec (count=%d, avg=%.3f kg)",
             consumption_kg,
             duration_seconds,
@@ -2149,7 +2206,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                     "start_time": current_time,
                     "start_learning_consumption": self._learning_consumption_total,
                 }
-                _LOGGER.info("Startup session started (state: %s)", current_state)
+                _LOGGER.debug("Startup session started (state: %s)", current_state)
         
         # Startup complete - reached stable operation
         elif reached_stable and self._current_startup_session is not None:
@@ -2163,13 +2220,13 @@ class AduroCoordinator(DataUpdateCoordinator):
                     duration_seconds=int(duration),
                     consumption_kg=consumption,
                 )
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Startup completed - duration: %.1f min, consumption: %.3f kg",
                     duration / 60,
                     consumption
                 )
             else:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Startup session invalid (duration: %.1fs, consumption: %.3f kg), not recording",
                     duration,
                     consumption
@@ -2263,7 +2320,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 # Check if this was a manual start (app/HA change) or automatic restart
                 app_change = data.get("app_change_detected", False)
                 
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Cooling session ending - duration: %.1f min, start_temp: %.1f°C, end_temp: %.1f°C, target: %.1f°C, app_change: %s",
                     duration / 60,
                     session["start_room_temp"],
@@ -2300,7 +2357,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         restart_data["avg_delta"] = restart_data["total_delta"] / (restart_data["count"] + 1)
                         restart_data["count"] += 1
                         
-                        _LOGGER.info(
+                        _LOGGER.debug(
                             "Recording AUTOMATIC restart delta: %.2f°C (avg=%.2f°C, count=%d)",
                             restart_delta,
                             restart_data["avg_delta"],
@@ -2318,9 +2375,9 @@ class AduroCoordinator(DataUpdateCoordinator):
                         if app_change:
                             reasons.append("app change detected")
                         
-                        _LOGGER.info("Restart was INTERRUPTED (%s), not recording restart delta", ", ".join(reasons))
+                        _LOGGER.debug("Restart was INTERRUPTED (%s), not recording restart delta", ", ".join(reasons))
                 else:
-                    _LOGGER.warning("Cooling session too short (%.1f min), not recording", duration / 60)
+                    _LOGGER.debug("Cooling session too short (%.1f min), not recording", duration / 60)
                 
                 self._current_cooling_session = None
         
@@ -2358,7 +2415,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         shutdown_data["avg_delta"] = shutdown_data["total_delta"] / (shutdown_data["count"] + 1)
                         shutdown_data["count"] += 1
                         
-                        _LOGGER.info(
+                        _LOGGER.debug(
                             "Stove entered waiting (AUTOMATIC), shutdown_delta=%.2f°C (avg=%.2f°C, count=%d)",
                             shutdown_delta,
                             shutdown_data["avg_delta"],
@@ -2368,7 +2425,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         # Trigger save
                         asyncio.create_task(self.async_save_pellet_data())
                     else:
-                        _LOGGER.info("Stove entered waiting (USER INTERRUPTED), not recording shutdown_delta")
+                        _LOGGER.debug("Stove entered waiting (USER INTERRUPTED), not recording shutdown_delta")
                 
                 _LOGGER.debug("Started cooling/waiting session")
             
@@ -3409,7 +3466,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         if self.data and "consumption" in self.data:
             today_consumption = self.data["consumption"].get("day", 0)
             self._consumption_at_refill = today_consumption
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Pellets refilled, baseline set to current daily consumption: %.2f kg",
                 today_consumption
             )
@@ -3423,7 +3480,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._low_pellet_notification_sent = False
         self._shutdown_notification_sent = False
         
-        _LOGGER.info(
+        _LOGGER.debug(
             "Pellets refilled - reset consumed from %.2f to 0.0 kg, capacity: %.1f kg, total consumed since cleaning: %.2f kg",
             old_consumed,
             self._pellet_capacity,
@@ -3436,7 +3493,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         """Reset total consumption counter after cleaning."""
         old_total = self._pellets_consumed_total
         self._pellets_consumed_total = 0.0
-        _LOGGER.info(
+        _LOGGER.debug(
             "Stove cleaned - total consumption counter reset from %.2f to 0.0 kg",
             old_total
         )
@@ -3446,25 +3503,25 @@ class AduroCoordinator(DataUpdateCoordinator):
     def set_pellet_capacity(self, capacity: float) -> None:
         """Set pellet capacity."""
         self._pellet_capacity = capacity
-        _LOGGER.info("Pellet capacity set to: %s kg", capacity)
+        _LOGGER.debug("Pellet capacity set to: %s kg", capacity)
         asyncio.create_task(self.async_save_pellet_data())
 
     def set_notification_level(self, level: float) -> None:
         """Set notification level (percentage)."""
         self._notification_level = level
-        _LOGGER.info("Notification level set to: %s%%", level)
+        _LOGGER.debug("Notification level set to: %s%%", level)
         asyncio.create_task(self.async_save_pellet_data())
 
     def set_shutdown_level(self, level: float) -> None:
         """Set auto-shutdown level (percentage)."""
         self._shutdown_level = level
-        _LOGGER.info("Shutdown level set to: %s%%", level)
+        _LOGGER.debug("Shutdown level set to: %s%%", level)
         asyncio.create_task(self.async_save_pellet_data())
 
     def set_auto_shutdown_enabled(self, enabled: bool) -> None:
         """Enable or disable automatic shutdown at low pellet level."""
         self._auto_shutdown_enabled = enabled
-        _LOGGER.info("Auto-shutdown %s", "enabled" if enabled else "disabled")
+        _LOGGER.debug("Auto-shutdown %s", "enabled" if enabled else "disabled")
 
     def set_auto_resume_after_wood(self, enabled: bool) -> None:
         """Enable or disable automatic resume after wood mode."""
@@ -3473,11 +3530,11 @@ class AduroCoordinator(DataUpdateCoordinator):
         
         # If disabling while in wood mode, send stop command to cancel pending resume
         if old_value and not enabled and self._was_in_wood_mode:
-            _LOGGER.info("Auto-resume disabled during wood mode - sending stop command to cancel pending resume")
+            _LOGGER.debug("Auto-resume disabled during wood mode - sending stop command to cancel pending resume")
             # Schedule the stop command
             asyncio.create_task(self.async_stop_stove())
         
-        _LOGGER.info("Auto-resume after wood mode %s", "enabled" if enabled else "disabled")
+        _LOGGER.debug("Auto-resume after wood mode %s", "enabled" if enabled else "disabled")
     
     # -------------------------------------------------------------------------
     # Temperature alert methods
@@ -3486,25 +3543,25 @@ class AduroCoordinator(DataUpdateCoordinator):
     def set_high_smoke_temp_threshold(self, temperature: float) -> None:
         """Set high smoke temperature threshold."""
         self._high_smoke_temp_threshold = temperature
-        _LOGGER.info("High smoke temp threshold set to: %s°C", temperature)
+        _LOGGER.debug("High smoke temp threshold set to: %s°C", temperature)
         asyncio.create_task(self.async_save_pellet_data())
 
     def set_high_smoke_duration_threshold(self, duration: int) -> None:
         """Set high smoke temperature duration threshold."""
         self._high_smoke_duration_threshold = duration
-        _LOGGER.info("High smoke duration threshold set to: %s seconds", duration)
+        _LOGGER.debug("High smoke duration threshold set to: %s seconds", duration)
         asyncio.create_task(self.async_save_pellet_data())
 
     def set_low_wood_temp_threshold(self, temperature: float) -> None:
         """Set low wood mode temperature threshold."""
         self._low_wood_temp_threshold = temperature
-        _LOGGER.info("Low wood temp threshold set to: %s°C", temperature)
+        _LOGGER.debug("Low wood temp threshold set to: %s°C", temperature)
         asyncio.create_task(self.async_save_pellet_data())
 
     def set_low_wood_duration_threshold(self, duration: int) -> None:
         """Set low wood mode temperature duration threshold."""
         self._low_wood_duration_threshold = duration
-        _LOGGER.info("Low wood duration threshold set to: %s seconds", duration)
+        _LOGGER.debug("Low wood duration threshold set to: %s seconds", duration)
         asyncio.create_task(self.async_save_pellet_data())
 
     def update_pellet_consumption(self, amount: float) -> None:
@@ -3518,31 +3575,31 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     async def async_start_stove(self) -> bool:
         """Start the stove."""
-        _LOGGER.info("Attempting to start stove")
+        _LOGGER.debug("Attempting to start stove")
         result = await self._async_send_command("misc.start", 1)
         if result:
             self._change_in_progress = True
             self._mode_change_started = datetime.now()
-            _LOGGER.info("Start command sent successfully")
+            _LOGGER.debug("Start command sent successfully")
         else:
             _LOGGER.error("Failed to send start command to stove")
         return result
 
     async def async_stop_stove(self) -> bool:
         """Stop the stove."""
-        _LOGGER.info("Attempting to stop stove")
+        _LOGGER.debug("Attempting to stop stove")
         result = await self._async_send_command("misc.stop", 1)
         if result:
             self._change_in_progress = True
             self._mode_change_started = datetime.now()
-            _LOGGER.info("Stop command sent successfully")
+            _LOGGER.debug("Stop command sent successfully")
         else:
             _LOGGER.error("Failed to send stop command to stove")
         return result
 
     async def _async_resume_pellet_operation(self) -> bool:
         """Internal method to command the stove to auto-resume pellet operation after wood mode."""
-        _LOGGER.info(
+        _LOGGER.debug(
             "Commanding stove to auto-resume pellet operation - Mode: %s, Heatlevel: %s, Temperature: %s",
             #self._pre_wood_mode_operation_mode,
             #self._pre_wood_mode_heatlevel,
@@ -3556,17 +3613,17 @@ class AduroCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Failed to send auto-resume start command")
             return False
         
-        _LOGGER.info("Auto-resume start command sent successfully - stove will resume when suitable")
+        _LOGGER.debug("Auto-resume start command sent successfully - stove will resume when suitable")
         
         # Wait a moment then restore the operation mode and settings
         await asyncio.sleep(3)
         
         # Restore previous operation mode and settings
         if self._pre_wood_mode_operation_mode == 0 and self._pre_wood_mode_heatlevel is not None:
-            _LOGGER.info("Setting heatlevel mode with level: %s", self._pre_wood_mode_heatlevel)
+            _LOGGER.debug("Setting heatlevel mode with level: %s", self._pre_wood_mode_heatlevel)
             await self.async_set_heatlevel(self._pre_wood_mode_heatlevel)
         elif self._pre_wood_mode_operation_mode == 1 and self._pre_wood_mode_temperature is not None:
-            _LOGGER.info("Setting temperature mode with temp: %s", self._pre_wood_mode_temperature)
+            _LOGGER.debug("Setting temperature mode with temp: %s", self._pre_wood_mode_temperature)
             await self.async_set_temperature(self._pre_wood_mode_temperature)
         else:
             _LOGGER.warning("No previous settings to restore, using defaults")
@@ -3576,29 +3633,29 @@ class AduroCoordinator(DataUpdateCoordinator):
     async def async_resume_after_wood_mode(self) -> bool:
         """Resume pellet operation after wood mode (state 9)."""
         if not self.data or "operating" not in self.data:
-            _LOGGER.error("No data available to resume after wood mode")
+            _LOGGER.debug("No data available to resume after wood mode")
             return False
         
         current_state = self.data["operating"].get("state")
         
         # Check if stove is in wood mode (state 9)
         if current_state not in ["9"]:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Cannot resume - stove not in wood mode (current state: %s)",
                 current_state
             )
             return False
         
-        _LOGGER.info("Manual resume requested from wood mode (state: %s)", current_state)
+        _LOGGER.debug("Manual resume requested from wood mode (state: %s)", current_state)
         return await self._async_resume_pellet_operation()
 
     async def async_set_heatlevel(self, heatlevel: int) -> bool:
         """Set the heat level (1-3)."""
         if heatlevel not in [1, 2, 3]:
-            _LOGGER.error("Invalid heatlevel: %s (must be 1, 2, or 3)", heatlevel)
+            _LOGGER.debug("Invalid heatlevel: %s (must be 1, 2, or 3)", heatlevel)
             return False
         
-        _LOGGER.info("Setting heatlevel to: %s (power: %s%%)", heatlevel, POWER_HEAT_LEVEL_MAP[heatlevel])
+        _LOGGER.debug("Setting heatlevel to: %s (power: %s%%)", heatlevel, POWER_HEAT_LEVEL_MAP[heatlevel])
         
         # Set targets
         self._target_heatlevel = heatlevel
@@ -3626,7 +3683,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         result = await self._async_send_command("regulation.fixed_power", fixed_power)
         
         if result:
-            _LOGGER.info("Heatlevel commands sent, waiting for stove confirmation")
+            _LOGGER.debug("Heatlevel commands sent, waiting for stove confirmation")
         else:
             _LOGGER.error("Failed to set heatlevel")
             self._change_in_progress = False
@@ -3637,7 +3694,7 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     async def async_set_temperature(self, temperature: float) -> bool:
         """Set the target temperature."""
-        _LOGGER.info("Setting temperature to: %s°C", temperature)
+        _LOGGER.debug("Setting temperature to: %s°C", temperature)
         
         # Set targets
         self._target_temperature = temperature
@@ -3664,7 +3721,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         result = await self._async_send_command("boiler.temp", temperature)
         
         if result:
-            _LOGGER.info("Temperature commands sent, waiting for stove confirmation")
+            _LOGGER.debug("Temperature commands sent, waiting for stove confirmation")
         else:
             _LOGGER.error("Failed to set temperature")
             self._change_in_progress = False
@@ -3676,11 +3733,11 @@ class AduroCoordinator(DataUpdateCoordinator):
     async def async_set_operation_mode(self, mode: int) -> bool:
         """Set the operation mode (0=heatlevel, 1=temperature, 2=wood)."""
         if mode not in [0, 1, 2]:
-            _LOGGER.error("Invalid operation mode: %s (must be 0, 1, or 2)", mode)
+            _LOGGER.debug("Invalid operation mode: %s (must be 0, 1, or 2)", mode)
             return False
         
         mode_names = {0: "heatlevel", 1: "temperature", 2: "wood"}
-        _LOGGER.info("Setting operation mode to: %s (%s)", mode, mode_names[mode])
+        _LOGGER.debug("Setting operation mode to: %s (%s)", mode, mode_names[mode])
         
         self._target_operation_mode = mode
         self._change_in_progress = True
@@ -3690,7 +3747,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         result = await self._async_send_command("regulation.operation_mode", mode)
         
         if result:
-            _LOGGER.info("Operation mode set successfully")
+            _LOGGER.debug("Operation mode set successfully")
         else:
             _LOGGER.error("Failed to set operation mode to %s", mode_names[mode])
         
@@ -3699,7 +3756,7 @@ class AduroCoordinator(DataUpdateCoordinator):
     async def async_toggle_mode(self) -> bool:
         """Toggle between heatlevel and temperature modes."""
         if not self.data or "status" not in self.data:
-            _LOGGER.error("No data available to toggle mode")
+            _LOGGER.debug("No data available to toggle mode")
             return False
         
         current_mode = self.data["status"].get("operation_mode", 0)
@@ -3708,7 +3765,7 @@ class AduroCoordinator(DataUpdateCoordinator):
         new_mode = 1 if current_mode == 0 else 0
         mode_names = {0: "heatlevel", 1: "temperature"}
         
-        _LOGGER.info("Toggling mode from %s to %s", mode_names.get(current_mode, current_mode), mode_names[new_mode])
+        _LOGGER.debug("Toggling mode from %s to %s", mode_names.get(current_mode, current_mode), mode_names[new_mode])
         
         # CRITICAL FIX: Set all targets BEFORE sending the command
         self._toggle_heat_target = True
@@ -3743,32 +3800,32 @@ class AduroCoordinator(DataUpdateCoordinator):
             self._target_temperature = None
             return False
         
-        _LOGGER.info("Mode toggle successful")
+        _LOGGER.debug("Mode toggle successful")
         return result
 
     async def async_force_auger(self) -> bool:
         """Force the auger to run."""
-        _LOGGER.info("Forcing auger to run")
+        _LOGGER.debug("Forcing auger to run")
         result = await self._async_send_command("auger.forced_run", 1)
         if result:
-            _LOGGER.info("Auger forced successfully")
+            _LOGGER.debug("Auger forced successfully")
         else:
             _LOGGER.error("Failed to force auger")
         return result
 
     async def async_reset_alarm(self) -> bool:
         """Reset alarm."""
-        _LOGGER.info("Resetting alarm")
+        _LOGGER.debug("Resetting alarm")
         result = await self.async_set_custom(path="misc.reset_alarm", value=1)
         if result:
-            _LOGGER.info("Alarm reset successfully")
+            _LOGGER.debug("Alarm reset successfully")
         else:
             _LOGGER.error("Failed to reset alarm")
         return result
 
     async def async_start_force_fan(self) -> bool:
         """Enter manual mode and start the fan."""
-        _LOGGER.info("Starting force fan")
+        _LOGGER.debug("Starting force fan")
         
         # Enter manual mode
         result = await self._async_send_command("manual.manual_mode", 1)
@@ -3796,7 +3853,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             timedelta(seconds=20),
         )
         
-        _LOGGER.info("Force fan started successfully")
+        _LOGGER.debug("Force fan started successfully")
         
         # Update coordinator data for UI sync
         if self.data:
@@ -3812,7 +3869,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Force fan already stopped")
             return True
         
-        _LOGGER.info("Stopping force fan (reason: %s)", reason)
+        _LOGGER.debug("Stopping force fan (reason: %s)", reason)
         
         # Stop keep-alive
         if self._force_fan_unsub:
@@ -3833,7 +3890,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             self.async_update_listeners()
         
         if result:
-            _LOGGER.info("Force fan stopped successfully")
+            _LOGGER.debug("Force fan stopped successfully")
         else:
             _LOGGER.error("Failed to exit manual mode (state cleared anyway)")
         
@@ -3869,7 +3926,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 max_seconds = self._force_fan_max_duration
                 
                 if elapsed > max_seconds:
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "Force fan stopped: max duration %d min reached",
                         self._force_fan_max_duration
                     )
@@ -3889,7 +3946,7 @@ class AduroCoordinator(DataUpdateCoordinator):
     def set_force_fan_max_duration(self, duration: int) -> None:
         """Set force fan maximum duration in seconds."""
         self._force_fan_max_duration = duration
-        _LOGGER.info(
+        _LOGGER.debug(
             "Force fan max duration set to: %d seconds",
             duration
         )
@@ -3897,10 +3954,10 @@ class AduroCoordinator(DataUpdateCoordinator):
 
     async def async_set_custom(self, path: str, value: Any) -> bool:
         """Set a custom parameter."""
-        _LOGGER.info("Setting custom parameter: %s = %s", path, value)
+        _LOGGER.debug("Setting custom parameter: %s = %s", path, value)
         result = await self._async_send_command(path, value)
         if result:
-            _LOGGER.info("Custom parameter set successfully")
+            _LOGGER.debug("Custom parameter set successfully")
         else:
             _LOGGER.error("Failed to set custom parameter: %s", path)
         return result
@@ -3923,20 +3980,20 @@ class AduroCoordinator(DataUpdateCoordinator):
                 data = response.parse_payload()
                 
                 if data == "":
-                    _LOGGER.info("Command sent successfully: %s = %s", path, value)
+                    _LOGGER.debug("Command sent successfully: %s = %s", path, value)
                     # Enable fast polling to catch the change
                     self.trigger_fast_polling()
                     # Request immediate update
                     await self.async_request_refresh()
                     return True
                 else:
-                    _LOGGER.warning(
+                    _LOGGER.debug(
                         "Command response not empty: %s = %s, response: %s",
                         path, value, data
                     )
                     
             except Exception as err:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Command attempt %d/%d failed: %s",
                     attempt + 1, retries, err
                 )
@@ -4016,7 +4073,7 @@ class AduroCoordinator(DataUpdateCoordinator):
             if smoke_temp <= self._low_wood_temp_threshold:
                 if self._low_wood_temp_start_time is None:
                     self._low_wood_temp_start_time = datetime.now()
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "Low wood mode temperature detected: %.1f°C (threshold: %.1f°C)",
                         smoke_temp,
                         self._low_wood_temp_threshold
@@ -4027,7 +4084,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                     elapsed = (datetime.now() - self._low_wood_temp_start_time).total_seconds()
                     if elapsed >= self._low_wood_duration_threshold:
                         if not self._low_wood_alert_sent:
-                            _LOGGER.warning(
+                            _LOGGER.debug(
                                 "LOW WOOD MODE TEMPERATURE ALERT: %.1f°C for %d seconds (threshold: %.1f°C for %d seconds)",
                                 smoke_temp,
                                 int(elapsed),
@@ -4051,7 +4108,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 # Reset alert flag only when temp rises significantly above threshold (hysteresis)
                 if smoke_temp > (self._low_wood_temp_threshold + 10):
                     if self._low_wood_alert_sent:
-                        _LOGGER.info("Low wood temperature alert cleared (temp: %.1f°C)", smoke_temp)
+                        _LOGGER.debug("Low wood temperature alert cleared (temp: %.1f°C)", smoke_temp)
                     self._low_wood_alert_sent = False
         else:
             # Not in wood mode - reset tracking
@@ -4083,7 +4140,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         "exceeded_by": int(elapsed - self._high_smoke_duration_threshold),
                     }
             except (TypeError, AttributeError):
-                pass
+                _LOGGER.debug("Error calculating time information for high smoke temp")
         
         # Calculate time information for low wood temp
         low_wood_time_info = None
@@ -4103,7 +4160,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                         "exceeded_by": int(elapsed - self._low_wood_duration_threshold),
                     }
             except (TypeError, AttributeError):
-                pass
+                _LOGGER.debug("Error calculating time information for low wood temp")
         
         # Store alert data
         data["alerts"]["high_smoke_temp_alert"] = {

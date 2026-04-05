@@ -322,7 +322,7 @@ The integration will automatically:
 - **Carbon Monoxide Level** - Current Carbon monoxide level (ppm)
 - **Carbon Monoxide Level Yellow** - Yellow Carbon monoxide level threshold (ppm)
 - **Carbon Monoxide Level Red** - Red Carbon monoxide level threshold (ppm)
-- 
+  
 #### Network
 - **Stove IP Address** - Current IP
 - **WiFi Network** - Connected SSID

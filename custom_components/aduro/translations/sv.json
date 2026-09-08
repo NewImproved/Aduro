@@ -311,6 +311,9 @@
       },
       "force_fan": {
         "name": "Tvinga fläkt"
+      },
+      "force_auger": {
+        "name": "Tvinga Skruv"
       }
     },
     "number": {
@@ -343,6 +346,9 @@
       },
      "force_fan_max_duration": {
         "name": "Max varaktighet för tvingad fläkt"
+      },
+     "force_auger_max_duration": {
+        "name": "Max varaktighet för tvingad pelletsmatning"
       }
     },
     "button": {
@@ -357,9 +363,6 @@
       },
       "resume_after_wood_mode": {
         "name": "Återuppta Efter Vedläge"
-      },
-      "force_auger": {
-        "name": "Tvinga Skruv"
       },
       "reset_alarm": {
         "name": "Återställ Alarm"

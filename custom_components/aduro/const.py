@@ -48,6 +48,19 @@ FORCE_FAN_DURATION_MIN: Final = 1 # seconds
 FORCE_FAN_DURATION_MAX: Final = 900 # seconds (15 minutes)
 FORCE_FAN_DURATION_STEP: Final = 1 # seconds
 
+# Force Auger Defaults
+FORCE_AUGER_DURATION_MIN: Final = 1  # seconds
+FORCE_AUGER_DURATION_MAX: Final = 300  # seconds (5 minutes)
+FORCE_AUGER_DURATION_STEP: Final = 1  # seconds
+DEFAULT_FORCE_AUGER_MAX_DURATION: Final = 15  # seconds - TUNE after testing
+
+# Manual-mode output_std values (path: "manual.output_std")
+# Fan is confirmed as 2 (existing force-fan implementation).
+# Auger value below is UNCONFIRMED - verify against real hardware/app
+# traffic and adjust here if the auger doesn't actually engage.
+MANUAL_OUTPUT_STD_FAN: Final = 2
+MANUAL_OUTPUT_STD_AUGER: Final = 1
+
 # Temperature Alert Limits
 HIGH_SMOKE_TEMP_MIN: Final = 300
 HIGH_SMOKE_TEMP_MAX: Final = 450

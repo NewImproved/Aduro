@@ -308,6 +308,9 @@
       },
       "force_fan": {
         "name": "Forcer le ventilateur"
+      },
+      "force_auger": {
+        "name": "Forcer la vis d'alimentation"
       }
     },
     "number": {
@@ -340,6 +343,9 @@
       },
       "force_fan_max_duration": {
         "name": "Durée maximale du ventilateur forcé"
+      },
+      "force_auger_max_duration": {
+        "name": "Durée maximale pour la vis d'alimentation forcé"
       }
     },
     "button": {
@@ -354,9 +360,6 @@
       },
       "resume_after_wood_mode": {
         "name": "Reprendre après le mode bois"
-      },
-      "force_auger": {
-        "name": "Forcer la vis d'alimentation"
       },
       "reset_alarm": {
         "name": "Réinitialiser l'alarme"

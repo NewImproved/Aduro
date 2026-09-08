@@ -52,7 +52,7 @@ FORCE_FAN_DURATION_STEP: Final = 1 # seconds
 FORCE_AUGER_DURATION_MIN: Final = 1  # seconds
 FORCE_AUGER_DURATION_MAX: Final = 300  # seconds (5 minutes)
 FORCE_AUGER_DURATION_STEP: Final = 1  # seconds
-DEFAULT_FORCE_AUGER_MAX_DURATION: Final = 15  # seconds - TUNE after testing
+DEFAULT_FORCE_AUGER_MAX_DURATION: Final = 15  # seconds
 
 # Manual-mode output_std values (path: "manual.output_std")
 MANUAL_OUTPUT_STD_FAN: Final = 2

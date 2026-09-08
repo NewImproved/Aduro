@@ -45,6 +45,8 @@ from .const import (
     TIMEOUT_COMMAND_RESPONSE,
     STARTUP_STATES,
     SHUTDOWN_STATES,
+    DEFAULT_FORCE_AUGER_MAX_DURATION,
+    MANUAL_OUTPUT_STD_AUGER,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -197,6 +199,12 @@ class AduroCoordinator(DataUpdateCoordinator):
         self._force_fan_started_at: datetime | None = None
         self._force_fan_max_duration = 60  # seconds, configurable
 
+        # Force auger tracking
+        self._force_auger_active = False
+        self._force_auger_unsub = None
+        self._force_auger_started_at: datetime | None = None
+        self._force_auger_max_duration = DEFAULT_FORCE_AUGER_MAX_DURATION  # seconds, configurable
+
         # Weather forecast sensor configuration
         self._weather_forecast_sensor = entry.data.get(CONF_WEATHER_FORECAST_SENSOR)
 
@@ -348,6 +356,10 @@ class AduroCoordinator(DataUpdateCoordinator):
             # Preserve force fan state across poll cycles
             data["force_fan_active"] = self._force_fan_active
             data["force_fan_stop_reason"] = self.data.get("force_fan_stop_reason") if self.data else None
+
+            # Preserve force auger state across poll cycles
+            data["force_auger_active"] = self._force_auger_active
+            data["force_auger_stop_reason"] = self.data.get("force_auger_stop_reason") if self.data else None
 
             # Add calculated/derived data
             _LOGGER.debug("Adding calculated data")
@@ -1050,6 +1062,15 @@ class AduroCoordinator(DataUpdateCoordinator):
             except (TypeError, AttributeError):
                 _LOGGER.debug("Error force fan")
 
+
+        # Force auger status
+        if self._force_auger_active and self._force_auger_started_at:
+            try:
+                elapsed = (datetime.now() - self._force_auger_started_at).total_seconds()
+                data["calculated"]["force_auger_running_seconds"] = int(elapsed)
+            except (TypeError, AttributeError):
+                _LOGGER.debug("Error force auger")
+
     async def _async_discover_stove(self) -> None:
         """Discover the stove on the network with retry logic and graceful fallback."""
         
@@ -1671,6 +1692,9 @@ class AduroCoordinator(DataUpdateCoordinator):
                 self._low_wood_temp_threshold = data.get("low_wood_temp_threshold", 175.0)
                 self._low_wood_duration_threshold = data.get("low_wood_duration_threshold", 300)
                 self._force_fan_max_duration = data.get("force_fan_max_duration", 60)
+                self._force_auger_max_duration = data.get(
+                    "force_auger_max_duration", DEFAULT_FORCE_AUGER_MAX_DURATION
+                )
 
                 # Load learning data (convert string keys back to tuples)
                 _LOGGER.debug("=== Starting to load learning data ===")
@@ -3423,6 +3447,7 @@ class AduroCoordinator(DataUpdateCoordinator):
                 "low_wood_temp_threshold": self._low_wood_temp_threshold,
                 "low_wood_duration_threshold": self._low_wood_duration_threshold,
                 "force_fan_max_duration": self._force_fan_max_duration,
+                "force_auger_max_duration": self._force_auger_max_duration,
                 # Save learning data (convert tuple keys to strings and datetime to isoformat for JSON compatibility)
                 "learning_data": {
                     "heating_observations": {
@@ -3803,16 +3828,6 @@ class AduroCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("Mode toggle successful")
         return result
 
-    async def async_force_auger(self) -> bool:
-        """Force the auger to run."""
-        _LOGGER.debug("Forcing auger to run")
-        result = await self._async_send_command("auger.forced_run", 1)
-        if result:
-            _LOGGER.debug("Auger forced successfully")
-        else:
-            _LOGGER.error("Failed to force auger")
-        return result
-
     async def async_reset_alarm(self) -> bool:
         """Reset alarm."""
         _LOGGER.debug("Resetting alarm")
@@ -3951,6 +3966,129 @@ class AduroCoordinator(DataUpdateCoordinator):
             duration
         )
         asyncio.create_task(self.async_save_pellet_data())
+
+    async def async_start_force_auger(self) -> bool:
+        """Enter manual mode and start the auger (forced feed)."""
+        _LOGGER.debug("Starting force auger")
+
+        # Enter manual mode
+        result = await self._async_send_command("manual.manual_mode", 1)
+        if not result:
+            _LOGGER.error("Failed to enter manual mode")
+            return False
+
+        await asyncio.sleep(1)
+
+        # Start auger (output_std=MANUAL_OUTPUT_STD_AUGER)
+        # NOTE: this output_std value is UNCONFIRMED - see const.py comment.
+        # If the auger doesn't physically engage, this is the first thing to check.
+        result = await self._async_send_command("manual.output_std", MANUAL_OUTPUT_STD_AUGER)
+        if not result:
+            _LOGGER.error("Failed to start auger")
+            await self._async_send_command("manual.manual_mode", 0)  # Exit manual mode
+            return False
+
+        # Track state
+        self._force_auger_active = True
+        self._force_auger_started_at = datetime.now()
+
+        # Start keep-alive interval (every 20 seconds)
+        self._force_auger_unsub = async_track_time_interval(
+            self.hass,
+            self._async_force_auger_tick,
+            timedelta(seconds=20),
+        )
+
+        _LOGGER.debug("Force auger started successfully")
+
+        # Update coordinator data for UI sync
+        if self.data:
+            self.data["force_auger_active"] = True
+            self.data["force_auger_stop_reason"] = None
+            self.async_update_listeners()
+
+        return True
+
+    async def async_stop_force_auger(self, reason: str = "manual") -> bool:
+        """Exit manual mode and stop the auger.
+
+        Called for BOTH the max-duration timeout and the user turning the
+        switch off early - exiting manual mode is the only known stop path,
+        so both cases converge here with a different `reason` for logging.
+        """
+        if not self._force_auger_active:
+            _LOGGER.debug("Force auger already stopped")
+            return True
+
+        _LOGGER.debug("Stopping force auger (reason: %s)", reason)
+
+        # Stop keep-alive
+        if self._force_auger_unsub:
+            self._force_auger_unsub()
+            self._force_auger_unsub = None
+
+        # Exit manual mode
+        result = await self._async_send_command("manual.manual_mode", 0)
+
+        # Update state regardless of command result
+        self._force_auger_active = False
+        self._force_auger_started_at = None
+
+        # Update coordinator data for UI sync
+        if self.data:
+            self.data["force_auger_active"] = False
+            self.data["force_auger_stop_reason"] = reason
+            self.async_update_listeners()
+
+        if result:
+            _LOGGER.debug("Force auger stopped successfully")
+        else:
+            _LOGGER.error("Failed to exit manual mode (state cleared anyway)")
+
+        return result
+
+    async def _async_force_auger_tick(self, now=None) -> None:
+        """Keep-alive tick every 20 seconds. Enforces max duration and sends keep-alive."""
+        if not self._force_auger_active:
+            # Safety check - shouldn't happen
+            if self._force_auger_unsub:
+                self._force_auger_unsub()
+                self._force_auger_unsub = None
+            return
+
+        # Timeout cutoff check - handles requirement #2 (auto-off)
+        if self._force_auger_started_at:
+            try:
+                elapsed = (datetime.now() - self._force_auger_started_at).total_seconds()
+                max_seconds = self._force_auger_max_duration
+
+                if elapsed > max_seconds:
+                    _LOGGER.debug(
+                        "Force auger stopped: max duration %d sec reached",
+                        self._force_auger_max_duration
+                    )
+                    await self.async_stop_force_auger(reason="timeout")
+                    return
+            except (TypeError, AttributeError) as err:
+                _LOGGER.debug("Error checking force auger timeout: %s", err)
+
+        # Send keep-alive
+        try:
+            await self._async_send_command("manual.keep_alive", 1)
+            _LOGGER.debug("Force auger keep-alive sent")
+        except Exception as err:
+            _LOGGER.error("Failed to send keep-alive, stopping force auger: %s", err)
+            await self.async_stop_force_auger(reason="error")
+
+    def set_force_auger_max_duration(self, duration: int) -> None:
+        """Set force auger maximum duration in seconds."""
+        self._force_auger_max_duration = duration
+        _LOGGER.debug(
+            "Force auger max duration set to: %d seconds",
+            duration
+        )
+        asyncio.create_task(self.async_save_pellet_data())
+
 
     async def async_set_custom(self, path: str, value: Any) -> bool:
         """Set a custom parameter."""

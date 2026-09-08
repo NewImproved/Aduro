@@ -3980,8 +3980,6 @@ class AduroCoordinator(DataUpdateCoordinator):
         await asyncio.sleep(1)
 
         # Start auger (output_std=MANUAL_OUTPUT_STD_AUGER)
-        # NOTE: this output_std value is UNCONFIRMED - see const.py comment.
-        # If the auger doesn't physically engage, this is the first thing to check.
         result = await self._async_send_command("manual.output_std", MANUAL_OUTPUT_STD_AUGER)
         if not result:
             _LOGGER.error("Failed to start auger")

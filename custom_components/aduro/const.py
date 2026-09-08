@@ -55,9 +55,6 @@ FORCE_AUGER_DURATION_STEP: Final = 1  # seconds
 DEFAULT_FORCE_AUGER_MAX_DURATION: Final = 15  # seconds - TUNE after testing
 
 # Manual-mode output_std values (path: "manual.output_std")
-# Fan is confirmed as 2 (existing force-fan implementation).
-# Auger value below is UNCONFIRMED - verify against real hardware/app
-# traffic and adjust here if the auger doesn't actually engage.
 MANUAL_OUTPUT_STD_FAN: Final = 2
 MANUAL_OUTPUT_STD_AUGER: Final = 1
 

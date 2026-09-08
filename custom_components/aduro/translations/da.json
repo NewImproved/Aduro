@@ -308,6 +308,9 @@
       },
       "force_fan": {
         "name": "Tving blæser"
+      },
+      "force_auger": {
+        "name": "Kør sneglen"
       }
     },
     "number": {
@@ -340,6 +343,9 @@
       },
       "force_fan_max_duration": {
         "name": "Maks. varighed for tvungen blæser"
+      },
+      "force_auger_max_duration": {
+        "name": "Maks. varighed for tvungen snegl"
       }
     },
     "button": {
@@ -354,9 +360,6 @@
       },
       "resume_after_wood_mode": {
         "name": "Fortsæt efter brændemode"
-      },
-      "force_auger": {
-        "name": "Kør sneglen"
       },
       "reset_alarm": {
         "name": "Nulstil alarm"

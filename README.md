@@ -109,7 +109,7 @@ The system automatically learns from your stove's operation by tracking:
   4. Automatic restart when temperature drops
 - Predicts multiple cycles until pellets run out
 - Accounts for stove's automatic level adjustments every 10+ minutes
-- Updates the calculation with the forecasted temperature for each hour into the simulation
+- Updates the calculation with the forecasted temperature for each hour into the simulation if forecast is available. Otherwise current temperature is used.
 - If the simulation ends where the room temperature is above target temperature, the simulation calculates a cooling period for the room temperature to cool down to the target temperature. This is to avoid big jumps in depletion times, where the calculation switches between adding another waiting period or burning through all pellets before reaching the waiting period.
 
 ### Prediction Accuracy
@@ -237,11 +237,13 @@ If you can confirm that the integration work for a stove, please let me know via
 1. Go to **Settings** → **Devices & Services**
 2. Click **"+ ADD INTEGRATION"**
 3. Search for **"Aduro Hybrid Stove"**
-4. Enter only 3 required details:
+4. Enter the following details:
    - **Serial Number**: Your stove's serial number
    - **PIN Code**: Your stove's PIN code
    - **Stove Model**: Select your model (H1-H6)
    - **IP-address**: Set fixed IP-address (optional)
+   - **External temperature sensor**: Set an outside temperature sensor (Recommended)
+   - **Weather forecast sensor**: Set an weather forecast sensor with hourly forecasts (Recommended)
 
 The integration will automatically:
 - Discover your stove on the network
@@ -320,7 +322,7 @@ The integration will automatically:
 - **Carbon Monoxide Level** - Current Carbon monoxide level (ppm)
 - **Carbon Monoxide Level Yellow** - Yellow Carbon monoxide level threshold (ppm)
 - **Carbon Monoxide Level Red** - Red Carbon monoxide level threshold (ppm)
-- 
+  
 #### Network
 - **Stove IP Address** - Current IP
 - **WiFi Network** - Connected SSID
@@ -367,7 +369,7 @@ The integration will automatically:
 
 #### Forced Fan Configuration
 - **Forced fan duration** - Fan duration threshold (1-900 seconds)
-- 
+  
 ### Buttons (5)
 
 - **Refill Pellets** - Mark pellets as refilled

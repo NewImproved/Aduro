@@ -308,6 +308,9 @@
       },
       "force_fan": {
         "name": "Force Fan"
+      },
+      "force_auger": {
+        "name": "Force Auger"
       }
     },
     "number": {
@@ -340,6 +343,9 @@
       },
      "force_fan_max_duration": {
         "name": "Force Fan Max Duration"
+      },
+     "force_fan_max_duration": {
+        "name": "Force Auger Max Duration"
       }
     },
     "button": {
@@ -354,9 +360,6 @@
       },
       "resume_after_wood_mode": {
         "name": "Resume After Wood Mode"
-      },
-      "force_auger": {
-        "name": "Force Auger"
       },
       "reset_alarm": {
         "name": "Reset Alarm"

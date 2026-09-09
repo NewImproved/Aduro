@@ -56,7 +56,7 @@ DEFAULT_FORCE_AUGER_MAX_DURATION: Final = 15  # seconds
 
 # Manual-mode output_std values (path: "manual.output_std")
 MANUAL_OUTPUT_STD_FAN: Final = 2
-MANUAL_OUTPUT_STD_AUGER: Final = 1
+MANUAL_OUTPUT_STD_AUGER: Final = 5
 
 # Temperature Alert Limits
 HIGH_SMOKE_TEMP_MIN: Final = 300

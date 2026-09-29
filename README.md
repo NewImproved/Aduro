@@ -18,7 +18,6 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H3, H5 [H4 a
 
 **Smart Operation**
 - Automatic retry on command failures
-- Fast polling during mode changes
 - External change detection (sync with mobile app)
 - Wood mode support with automatic resume for when the stove is in heat level mode.
 
@@ -41,12 +40,25 @@ A comprehensive Home Assistant custom integration for Aduro H1, H2, H3, H5 [H4 a
 - Automatic shutdown at critical level
 - Pellets consumption since last cleaning counter
 
-**Smart Features**
-- Ignition timer countdowns
+**Other Features**
 - Mode transition tracking
 - Change-in-progress detection
 - Automatic state synchronization
+- Run auger manually
 
+
+**Multi-Language Support**
+- English
+- Danish
+- French
+- German
+- Swedish
+- Easy to add more languages
+
+**Persisting Settings and tracking**
+- Configurations, user settings and some sensors are saved on file to survive restarts and upgrades.
+
+  
 **Pellet Depletion Prediction**
 
 - A prediction system that learns your stove's actual consumption patterns and predicts when pellets will run out, including date and time.
@@ -183,16 +195,6 @@ Before showing predictions, the system needs:
 </details>
 
 
-**Multi-Language Support**
-- English
-- Danish
-- French
-- German
-- Swedish
-- Easy to add more languages
-
-**Persisting Settings and tracking**
-- Configurations, user settings and some sensors are saved on file to survive restarts and upgrades.
 
 ## Supported Models
 Only Aduro H1, H2, H3 & H5 have been confirmed to work with the integration.
@@ -268,18 +270,23 @@ The integration will automatically:
   - Duration threshold: 10 seconds -30 minutes (default: 5 minutes)
   - Alerts when wood fire might be going out
 
+#### Forced/Manual settings
+- Maximum run time for forced fan
+- Maximum temperature for foced fan
+- Maximum run time for forced auger
+
+- 
 #### Advanced Settings
 - Auto-resume after wood mode (for when the stove is in heat level mode)
 
 ## Entities
 
-### Sensors (38)
+### Sensors
 
 #### Status & Operation
 - **State** - Main status (Operating II, Stopped, etc.)
 - **Substate** - Detailed status (with timers for i.e. start up)
 - **Heat Level** - Current heat level (1-3)
-- **Heat Level Display** - Roman numerals (I, II, III)
 - **Operation Mode** - Current mode (0=Heat Level, 1=Temperature, 2=Wood)
 
 #### Temperatures
@@ -343,14 +350,15 @@ The integration will automatically:
 - **Display Target** - Current target value
 - **External Change Detected** - App changes
 
-### Switches (3)
+### Switches
 
 - **Power** - Start/Stop the stove
 - **Auto Shutdown at Low Pellets** - Enable automatic shutdown at a certain pellets level and time
 - **Auto Resume After Wood Mode** - Enable automatic resume when in heat level mode. Activates when the smoke temperature drops below 120°C.
 - **Forced fan** - Runs fan until either smoke temp exceeds 320°C or the set time is exceeded.
+- **Force Auger** - Manually run auger for a set time
 
-### Numbers (9)
+### Numbers
 
 #### Heat Control
 - **Heat Level** - Set heat level (1-3)
@@ -369,14 +377,14 @@ The integration will automatically:
 
 #### Forced Fan Configuration
 - **Forced fan duration** - Fan duration threshold (1-900 seconds)
+- **Forced auger duration** - Fan duration threshold (1-300 seconds)
   
-### Buttons (5)
+### Buttons
 
 - **Refill Pellets** - Mark pellets as refilled
 - **Clean Stove** - Reset refill counter after cleaning
 - **Toggle Mode** - Switch between Heat Level/Temperature modes
 - **Resume After Wood Mode** - Manual resume from wood mode
-- **Force Auger** - Manually run auger (advanced)
 - **Alert Reset** - Resets Alerts
 
 ## Services

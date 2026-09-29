@@ -31,7 +31,6 @@ async def async_setup_entry(
         AduroCleanStoveButton(coordinator, entry),
         AduroToggleModeButton(coordinator, entry),
         AduroResumeAfterWoodButton(coordinator, entry),
-        AduroForceAugerButton(coordinator, entry),
         AduroResetAlarmButton(coordinator, entry),
     ]
 
@@ -363,28 +362,6 @@ class AduroResumeAfterWoodButton(AduroButtonBase):
             await self.coordinator.async_request_refresh()
         else:
             _LOGGER.error("Button: Failed to resume after wood mode")
-
-
-class AduroForceAugerButton(AduroButtonBase):
-    """Button to force the auger to run."""
-
-    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the button."""
-        super().__init__(coordinator, entry, "force_auger", "force_auger")
-        self._attr_icon = "mdi:cog-play"
-
-    async def async_press(self) -> None:
-        """Handle button press."""
-        _LOGGER.debug("Button: Forcing auger to run")
-        
-        success = await self.coordinator.async_force_auger()
-        
-        if success:
-            _LOGGER.debug("Button: Auger forced successfully")
-            # Request immediate update
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Button: Failed to force auger")
 
 
 class AduroResetAlarmButton(AduroButtonBase):

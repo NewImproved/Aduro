@@ -47,6 +47,9 @@ from .const import (
     FORCE_FAN_DURATION_MIN,
     FORCE_FAN_DURATION_MAX,
     FORCE_FAN_DURATION_STEP,
+    FORCE_AUGER_DURATION_MIN,
+    FORCE_AUGER_DURATION_MAX,
+    FORCE_AUGER_DURATION_STEP,
 )
 from .coordinator import AduroCoordinator
 
@@ -75,6 +78,7 @@ async def async_setup_entry(
         AduroLowWoodTempThresholdNumber(coordinator, entry),
         AduroLowWoodDurationThresholdNumber(coordinator, entry),
         AduroForceFanMaxDurationNumber(coordinator, entry),
+        AduroForceAugerMaxDurationNumber(coordinator, entry),
     ]
 
     async_add_entities(numbers)
@@ -741,6 +745,58 @@ class AduroForceFanMaxDurationNumber(AduroNumberBase):
         _LOGGER.debug("Number: Setting force fan max duration to %s minutes", duration)
         
         self.coordinator.set_force_fan_max_duration(duration)
+        await self.coordinator.async_request_refresh()
+
+    async def _actually_set_value(self, value: float) -> None:
+        """Not used - duration changes are immediate."""
+        pass
+
+
+class AduroForceAugerMaxDurationNumber(AduroNumberBase):
+    """Number entity for force auger maximum duration."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the number entity."""
+        super().__init__(coordinator, entry, "force_auger_max_duration", "force_auger_max_duration")
+        self._attr_icon = "mdi:timer-outline"
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_mode = NumberMode.BOX
+        self._attr_native_min_value = FORCE_AUGER_DURATION_MIN
+        self._attr_native_max_value = FORCE_AUGER_DURATION_MAX
+        self._attr_native_step = FORCE_AUGER_DURATION_STEP
+        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current max duration."""
+        return float(self.coordinator._force_auger_max_duration)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {
+            "duration_seconds": self.coordinator._force_auger_max_duration,
+        }
+
+        force_auger_active = self.coordinator.data.get("force_auger_active", False)
+        attrs["force_auger_active"] = force_auger_active
+
+        if force_auger_active:
+            running_seconds = self.coordinator.data.get("calculated", {}).get("force_auger_running_seconds")
+            if running_seconds is not None:
+                attrs["time_elapsed_seconds"] = running_seconds
+                attrs["time_remaining_seconds"] = max(
+                    0, self.coordinator._force_auger_max_duration - running_seconds
+                )
+
+        return attrs
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the max duration - no debouncing needed for config values."""
+        duration = int(value)
+        _LOGGER.debug("Number: Setting force auger max duration to %s seconds", duration)
+
+        self.coordinator.set_force_auger_max_duration(duration)
         await self.coordinator.async_request_refresh()
 
     async def _actually_set_value(self, value: float) -> None:

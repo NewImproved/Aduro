@@ -30,6 +30,7 @@ async def async_setup_entry(
         AduroAutoShutdownSwitch(coordinator, entry),
         AduroAutoResumeAfterWoodSwitch(coordinator, entry),
         AduroForceFanSwitch(coordinator, entry),
+        AduroForceAugerSwitch(coordinator, entry),
     ]
 
     async_add_entities(switches)
@@ -381,4 +382,61 @@ class AduroForceFanSwitch(AduroSwitchBase):
         """Turn off force fan."""
         _LOGGER.debug("Switch: Turning off force fan")
         await self.coordinator.async_stop_force_fan(reason="manual")
+        await self.coordinator.async_request_refresh()
+
+
+class AduroForceAugerSwitch(AduroSwitchBase):
+    """Switch to run the auger in manual mode (forced feed)."""
+
+    def __init__(self, coordinator: AduroCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the switch."""
+        super().__init__(coordinator, entry, "force_auger", "force_auger")
+        self._attr_icon = "mdi:cog-play"
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if force auger is active."""
+        return self.coordinator.data.get("force_auger_active", False)
+
+    @property
+    def icon(self) -> str:
+        """Return icon based on state."""
+        if self.is_on:
+            return "mdi:cog-play"
+        return "mdi:cog-off-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional state attributes."""
+        attrs = {
+            "max_duration_seconds": self.coordinator._force_auger_max_duration,
+        }
+
+        # Add running time if active
+        if self.is_on:
+            running_seconds = self.coordinator.data.get("calculated", {}).get("force_auger_running_seconds")
+            if running_seconds is not None:
+                attrs["running_seconds"] = running_seconds
+
+        # Covers both auto-off (timeout) and manual off reasons
+        stop_reason = self.coordinator.data.get("force_auger_stop_reason")
+        if stop_reason:
+            attrs["last_stop_reason"] = stop_reason
+
+        return attrs
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on force auger."""
+        _LOGGER.debug("Switch: Turning on force auger")
+        success = await self.coordinator.async_start_force_auger()
+
+        if success:
+            await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.error("Switch: Failed to turn on force auger")
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off force auger (handles turning it off early, before the timer)."""
+        _LOGGER.debug("Switch: Turning off force auger")
+        await self.coordinator.async_stop_force_auger(reason="manual")
         await self.coordinator.async_request_refresh()

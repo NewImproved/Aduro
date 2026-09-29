@@ -308,6 +308,9 @@
       },
       "force_fan": {
         "name": "Lüfter erzwingen"
+      },
+      "force_auger": {
+        "name": "Schnecke erzwingen"
       }
     },
     "number": {
@@ -340,6 +343,9 @@
       },
       "force_fan_max_duration": {
         "name": "Max. Dauer für erzwungenen Lüfterbetrieb"
+      },
+      "force_auger_max_duration": {
+        "name": "Max. Dauer für erzwungenen Schnecke"
       }
     },
     "button": {
@@ -354,9 +360,6 @@
       },
       "resume_after_wood_mode": {
         "name": "Nach Holzmodus fortsetzen"
-      },
-      "force_auger": {
-        "name": "Schnecke erzwingen"
       },
       "reset_alarm": {
         "name": "Alarm zurücksetzen"

@@ -272,10 +272,9 @@ The integration will automatically:
 
 #### Forced/Manual settings
 - Maximum run time for forced fan
-- Maximum temperature for foced fan
 - Maximum run time for forced auger
 
-- 
+  
 #### Advanced Settings
 - Auto-resume after wood mode (for when the stove is in heat level mode)
 
@@ -389,6 +388,9 @@ The integration will automatically:
 
 ## Services
 
+<details>
+<summary><strong>Show more</strong></summary>
+  
 All services are available under the `aduro` domain:
 
 ### Basic Control
@@ -419,23 +421,11 @@ data:
 service: aduro.toggle_mode
 ```
 
-### Advanced
+</details>
 
-```yaml
-# Resume pellet operation after wood mode
-service: aduro.resume_after_wood_mode
-
-# Force auger to run
-service: aduro.force_auger
-
-# Set custom parameter (advanced)
-service: aduro.set_custom
-data:
-  path: "auger.forced_run"
-  value: 1
-```
-
-## Automations Examples
+### Automation Examples
+<details>
+<summary><strong>Show more</strong></summary>
 
 ### Morning Warmup
 
@@ -559,6 +549,8 @@ automation:
           title: "✅ Stove Alert Cleared"
           message: "Smoke temperature has returned to normal"
 ```
+
+</details>
 
 ## Troubleshooting
 

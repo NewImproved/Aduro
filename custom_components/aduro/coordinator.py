@@ -196,12 +196,14 @@ class AduroCoordinator(DataUpdateCoordinator):
         # Force fan tracking
         self._force_fan_active = False
         self._force_fan_unsub = None
+        self._force_fan_timeout_unsub = None
         self._force_fan_started_at: datetime | None = None
         self._force_fan_max_duration = 60  # seconds, configurable
 
         # Force auger tracking
         self._force_auger_active = False
         self._force_auger_unsub = None
+        self._force_auger_timeout_unsub = None
         self._force_auger_started_at: datetime | None = None
         self._force_auger_max_duration = DEFAULT_FORCE_AUGER_MAX_DURATION  # seconds, configurable
 
@@ -3867,7 +3869,10 @@ class AduroCoordinator(DataUpdateCoordinator):
             self._async_force_fan_tick,
             timedelta(seconds=20),
         )
-        
+
+        # Schedule exact stop at max duration (independent of the 20s tick)
+        self._schedule_force_fan_timeout()
+
         _LOGGER.debug("Force fan started successfully")
         
         # Update coordinator data for UI sync
@@ -3890,7 +3895,12 @@ class AduroCoordinator(DataUpdateCoordinator):
         if self._force_fan_unsub:
             self._force_fan_unsub()
             self._force_fan_unsub = None
-        
+
+        # Cancel pending max-duration timer
+        if self._force_fan_timeout_unsub:
+            self._force_fan_timeout_unsub()
+            self._force_fan_timeout_unsub = None
+            
         # Exit manual mode
         result = await self._async_send_command("manual.manual_mode", 0)
         
@@ -3958,6 +3968,54 @@ class AduroCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Failed to send keep-alive, stopping force fan: %s", err)
             await self.async_stop_force_fan(reason="error")
 
+    def _schedule_force_fan_timeout(self) -> None:
+        """(Re)schedule the one-shot stop for the force fan based on remaining time."""
+        if self._force_fan_timeout_unsub:
+            self._force_fan_timeout_unsub()
+            self._force_fan_timeout_unsub = None
+
+        if not self._force_fan_started_at:
+            return
+
+        elapsed = (datetime.now() - self._force_fan_started_at).total_seconds()
+        remaining = max(0, self._force_fan_max_duration - elapsed)
+        self._force_fan_timeout_unsub = async_call_later(
+            self.hass, remaining, self._async_force_fan_timeout
+        )
+        _LOGGER.debug("Force fan timeout scheduled in %.1f seconds", remaining)
+
+    async def _async_force_fan_timeout(self, now=None) -> None:
+        """Called when the force fan max duration is reached."""
+        self._force_fan_timeout_unsub = None
+        if not self._force_fan_active:
+            return
+        _LOGGER.debug("Force fan max duration reached, stopping")
+        await self.async_stop_force_fan(reason="timeout")
+
+    def _schedule_force_auger_timeout(self) -> None:
+        """(Re)schedule the one-shot stop for the force auger based on remaining time."""
+        if self._force_auger_timeout_unsub:
+            self._force_auger_timeout_unsub()
+            self._force_auger_timeout_unsub = None
+
+        if not self._force_auger_started_at:
+            return
+
+        elapsed = (datetime.now() - self._force_auger_started_at).total_seconds()
+        remaining = max(0, self._force_auger_max_duration - elapsed)
+        self._force_auger_timeout_unsub = async_call_later(
+            self.hass, remaining, self._async_force_auger_timeout
+        )
+        _LOGGER.debug("Force auger timeout scheduled in %.1f seconds", remaining)
+
+    async def _async_force_auger_timeout(self, now=None) -> None:
+        """Called when the force auger max duration is reached."""
+        self._force_auger_timeout_unsub = None
+        if not self._force_auger_active:
+            return
+        _LOGGER.debug("Force auger max duration reached, stopping")
+        await self.async_stop_force_auger(reason="timeout")
+
     def set_force_fan_max_duration(self, duration: int) -> None:
         """Set force fan maximum duration in seconds."""
         self._force_fan_max_duration = duration
@@ -3965,6 +4023,8 @@ class AduroCoordinator(DataUpdateCoordinator):
             "Force fan max duration set to: %d seconds",
             duration
         )
+        if self._force_fan_active:
+            self._schedule_force_fan_timeout()
         asyncio.create_task(self.async_save_pellet_data())
 
     async def async_start_force_auger(self) -> bool:
@@ -3997,6 +4057,9 @@ class AduroCoordinator(DataUpdateCoordinator):
             timedelta(seconds=20),
         )
 
+        # Schedule exact stop at max duration (independent of the 20s tick)
+        self._schedule_force_auger_timeout()
+        
         _LOGGER.debug("Force auger started successfully")
 
         # Update coordinator data for UI sync
@@ -4025,6 +4088,11 @@ class AduroCoordinator(DataUpdateCoordinator):
             self._force_auger_unsub()
             self._force_auger_unsub = None
 
+        # Cancel pending max-duration timer
+        if self._force_auger_timeout_unsub:
+            self._force_auger_timeout_unsub()
+            self._force_auger_timeout_unsub = None
+            
         # Exit manual mode
         result = await self._async_send_command("manual.manual_mode", 0)
 
@@ -4085,6 +4153,8 @@ class AduroCoordinator(DataUpdateCoordinator):
             "Force auger max duration set to: %d seconds",
             duration
         )
+        if self._force_auger_active:
+            self._schedule_force_auger_timeout()
         asyncio.create_task(self.async_save_pellet_data())
 
 

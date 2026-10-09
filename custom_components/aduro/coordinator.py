@@ -9,7 +9,7 @@ from typing import Any
 import math
 
 from pyduro.actions import discover, get, set, raw, STATUS_PARAMS
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant

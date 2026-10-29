@@ -6,9 +6,16 @@
 
 # Aduro Hybrid Stove Integration for Home Assistant
 A comprehensive Home Assistant custom integration for Aduro H1, H2, H3, H5 [H4 and H6 unconfirmed] hybrid pellet stoves.
-
-
+  
 ## Features
+
+<details>
+<summary><strong>Screenshot of integration</strong></summary>
+
+<img width="420" height="3568" alt="image" src="https://github.com/user-attachments/assets/c05dea85-d4ee-4660-92c3-5ed988e36c09" />
+
+
+</details>
 
 **Complete Control**
 - Start/Stop stove remotely

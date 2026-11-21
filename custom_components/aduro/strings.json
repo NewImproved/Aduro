@@ -344,7 +344,7 @@
      "force_fan_max_duration": {
         "name": "Force Fan Max Duration"
       },
-     "force_fan_max_duration": {
+     "force_auger_max_duration": {
         "name": "Force Auger Max Duration"
       }
     },
